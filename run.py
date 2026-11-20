@@ -12,6 +12,42 @@ from pathlib import Path
 from briefing import cluster, cost, extract, ingest, make, rank
 
 
+def extract_stories_with_retry(stories, out_dir: Path):
+    """Run extract.extract_story for each clustered story with up to two attempts.
+    On final failure, record {story_id, error} under out/extract_errors.json and continue.
+    Returns (facts, errors_list).
+    """
+    facts = []
+    errors = []
+
+    def do_one(story):
+        sid = story.get("story_id")
+        last_exc = None
+        for _ in range(2):
+            try:
+                return ("ok", extract.extract_story(story))
+            except Exception as e:  # noqa: BLE001 - we want to capture and log any failure
+                last_exc = e
+        # both attempts failed
+        err_msg = f"{type(last_exc).__name__}: {last_exc}"
+        return ("err", {"story_id": sid, "error": err_msg})
+
+    with ThreadPoolExecutor(8) as pool:
+        jobs = {pool.submit(do_one, s): s for s in stories}
+        for job in as_completed(jobs):
+            status, payload = job.result()
+            if status == "ok":
+                facts.append(payload)
+            else:
+                errors.append(payload)
+
+    if errors:
+        (out_dir / "extract_errors.json").write_text(
+            json.dumps(errors, indent=2, ensure_ascii=False), encoding="utf-8"
+        )
+    return facts, errors
+
+
 def build_stories(args, out):
     articles, merged = ingest.load_articles(args.data, args.since, args.until)
     articles = articles[: args.limit]
@@ -20,10 +56,11 @@ def build_stories(args, out):
     stories = cluster.cluster(articles)
     print(f"{len(stories)} stories after clustering")
 
-    with ThreadPoolExecutor(8) as pool:
-        facts = list(pool.map(extract.extract_story, stories))
+    facts, errors = extract_stories_with_retry(stories, out)
     facts.sort(key=rank.global_score, reverse=True)
     (out / "stories.json").write_text(json.dumps(facts, indent=2, ensure_ascii=False), encoding="utf-8")
+    if errors:
+        print(f"{len(errors)} storie(s) failed during extraction; see {out / 'extract_errors.json'}")
     return facts, len(articles)
 
 
