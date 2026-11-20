@@ -9,8 +9,11 @@ _client = None
 def client():
     global _client
     if _client is None:
+        import os
         from openai import OpenAI
-        _client = OpenAI(timeout=90, max_retries=3)
+        # Writing a full script with the large reasoning model can take several minutes;
+        # 90 s timed out every script call. Override with OPENAI_TIMEOUT (seconds) in .env.
+        _client = OpenAI(timeout=float(os.getenv("OPENAI_TIMEOUT", 600)), max_retries=2)
     return _client
 
 

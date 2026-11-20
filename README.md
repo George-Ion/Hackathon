@@ -32,11 +32,14 @@ data/raw/**/*.jsonl
 ## Setup
 
 ```powershell
-python -m venv .venv313
-.venv313\Scripts\Activate.ps1
+python -m venv .venv
+.venv\Scripts\Activate.ps1
 python -m pip install -r requirements.txt
 copy .env.example .env   # add API keys; ElevenLabs key needs Text to Speech permission
 ```
+
+Use only `.venv` (Python 3.14). Running `server.py` with another Python (for example Anaconda's) starts a page
+that can't find the OpenAI package and greys out "Generate edition".
 
 Place the Sourcera JSONL feed files in `data/raw/` (it's gitignored; delete licensed article data after the event).
 
@@ -53,7 +56,21 @@ python server.py                                                 # test page on 
 With no `--since` argument, the runner includes all dates in the supplied feed files. Use an explicit window for
 daily editions; the Zacks sample has July dates while the other feeds cover the hackathon week.
 
-Audio is synthesized through the ElevenLabs REST API using `requests`; no ElevenLabs SDK install is required. Set `API_BUDGET_USD` to override the default $5 run cap.
+Audio is synthesized through the ElevenLabs REST API using `requests`; no ElevenLabs SDK install is required.
+Every paid call (OpenAI and ElevenLabs) is appended to `out/spend.log`; `API_BUDGET_USD` in `.env` (default $5)
+caps the ledger total. Text-only runs delete a listener's old MP3 on purpose, so stale audio never plays with a
+new script: make audio last, with `--audio-only`.
+
+## Checks and agents
+
+```powershell
+python -m unittest discover -s tests                # unit tests, no API calls
+python tools/check_done.py                          # DONE.md checklist, no API calls (--text-only before audio)
+python agents/run_agents.py --tasks P1-1 --budget 3 # GPT-5 worker + critic for a task in AGENT_PLAN.md
+```
+
+The agent runner commits each task the critic passes on the current branch (never pushes), and logs every call and
+its cost to `agents/logs/`.
 
 The **test page** (`server.py` + `web/index.html`) reuses `out/stories.json`. It lets you pick or edit a
 listener (including the live wildcard), generate a briefing with or without audio, compare two briefings
