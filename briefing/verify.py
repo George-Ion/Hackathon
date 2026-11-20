@@ -21,7 +21,18 @@ SCALES = {
     "miljard": 1_000_000_000,
     "trillion": 1_000_000_000_000,
 }
-ADVICE = re.compile(r"\b(you should (buy|sell|invest)|buy now|sell now|good time to (buy|invest)|we recommend)\b", re.I)
+ADVICE = re.compile(
+    r"\b("
+    r"you should (?:buy|sell|invest)"  # EN
+    r"|buy now|sell now|good time to (?:buy|invest)|we recommend"
+    r"|kaufen sie|verkaufen sie|jetzt kaufen|jetzt verkaufen"  # DE
+    r"|wir empfehlen|sie sollten (?:kaufen|verkaufen|investieren)"
+    r"|koop nu|verkoop nu|wij raden aan"  # NL
+    r"|je moet (?:kopen|verkopen|beleggen)"
+    r"|goed moment om (?:te )?(?:kopen|beleggen)"
+    r")\b",
+    re.I,
+)
 
 SYSTEM = """You check a spoken news segment against its source facts.
 For each factual claim in the segment, decide: supported, unsupported (not in facts), or contradicted.
