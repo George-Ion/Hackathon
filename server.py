@@ -132,6 +132,9 @@ class Handler(SimpleHTTPRequestHandler):
             return self._json({k: story.get(k) for k in ("story_id", "headline", "summary", "topics", "importance", "n_sources", "published", "facts", "conflicts")} | {
                 "articles": [{k: a.get(k) for k in ("id", "outlet", "title", "url", "published", "language", "translations")} for a in story.get("articles", [])]
             })
+        if path == "/api/prerank":
+            pr = read_json(OUT / "prerank.json", {}) or {}
+            return self._json({k: pr.get(k) for k in ("groups", "shortlisted", "k_per_listener", "k_global", "listeners")})
         if path == "/api/briefings":
             return self._json(sorted(p.name[: -len(".summary.json")] for p in OUT.glob("*.summary.json")))
         if path.startswith("/api/briefing/"):

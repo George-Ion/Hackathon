@@ -101,11 +101,21 @@ def _apply_source_filter(extracted_story, articles):
     extracted_story["dropped_facts"] = dropped_facts
 
 
-def extract_story(story, max_chars=4000):
+def _diverse(articles, n):
+    """Up to n articles, one per outlet first: other outlets add facts, a second article from the
+    same outlet mostly repeats them."""
+    first, rest, seen = [], [], set()
+    for a in articles:
+        (rest if a["source"] in seen else first).append(a)
+        seen.add(a["source"])
+    return (first + rest)[:n]
+
+
+def extract_story(story, max_chars=3000, max_articles=5):
     docs = [
         {"id": a["id"], "outlet": a["source"], "published": a["published"], "sections": a["sections"],
          "title": a["title"], "text": (a["text"] or a["excerpt"] or "")[:max_chars]}
-        for a in story["articles"][:8]
+        for a in _diverse(story["articles"], max_articles)
     ]
     out = chat_json("extract", CHEAP_MODEL, SYSTEM, json.dumps(docs, ensure_ascii=False))
     sid = story["story_id"]

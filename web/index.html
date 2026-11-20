@@ -226,9 +226,8 @@ footer{padding:48px 0 64px;border-top:1px solid var(--line);color:var(--dim);fon
 </div></nav>
 
 <header class="hero"><div class="wrap">
-  <div class="label" id="edition">Daily edition</div>
   <h1>Your morning.<br><span>Verified.</span></h1>
-  <p>A day of business and finance news, grouped into stories, written for one listener, and read aloud. Every number and claim traces back to the article it came from.</p>
+  <p>The news you care about, read to you in a few minutes. Tap any sentence to see the article behind it.</p>
   <div class="pills" id="pills"></div>
 </div></header>
 
@@ -298,12 +297,13 @@ footer{padding:48px 0 64px;border-top:1px solid var(--line);color:var(--dim);fon
 <!-- COST -->
 <section class="block" id="cost"><div class="wrap">
   <div class="shead"><div><div class="crit">Scalability and cost</div><h2>The large model only writes the script.</h2></div>
-    <p>Grouping, translation matching and ranking are free rules and embeddings. A small model extracts facts and checks claims. The large model writes one script per listener, so cost barely grows with article volume.</p></div>
+    <p>Free signals decide which stories are worth a model call, so extraction stays the same size whether a day has a hundred articles or ten thousand. A small model extracts facts and checks claims; the large model only writes one script per listener.</p></div>
   <div class="costgrid" id="costgrid"></div>
   <div class="flow">
     <div class="step"><b>Ingest</b>Fields, date window, translations folded<span class="t free">Rules · free</span></div>
     <div class="step"><b>Cluster</b>Embeddings, average-linkage merging<span class="t cheap">Embeddings</span></div>
-    <div class="step"><b>Extract</b>Facts and figures with article IDs<span class="t cheap">Small model</span></div>
+    <div class="step"><b>Pre-rank</b>Coverage, recency, listener fit: only the shortlist goes on<span class="t free">Rules + embeddings</span></div>
+    <div class="step"><b>Extract</b>Facts and figures with article IDs, shortlist only<span class="t cheap">Small model</span></div>
     <div class="step"><b>Rank</b>Importance, coverage, interests<span class="t free">Rules · free</span></div>
     <div class="step"><b>Script</b>Written for the ear, word limit<span class="t large">Large model</span></div>
     <div class="step"><b>Verify</b>Numbers, advice, claim check, repair<span class="t cheap">Rules + small model</span></div>
@@ -344,7 +344,7 @@ const fmt = s => (s == null || isNaN(s)) ? '--:--' : `${Math.floor(s/60)}:${Stri
 const money = v => v == null ? '—' : (v < 1 ? `$${v.toFixed(2)}` : `$${v.toFixed(2)}`);
 function toast(m){ const t=$('#toast'); t.textContent=m; t.classList.add('show'); clearTimeout(toast.t); toast.t=setTimeout(()=>t.classList.remove('show'),3200); }
 
-const S = { listeners:[], names:[], stories:[], byId:{}, details:{}, status:{}, cost:{}, cur:null, data:null, profiles:{}, shown:24, cache:{} };
+const S = { prerank:{}, listeners:[], names:[], stories:[], byId:{}, details:{}, status:{}, cost:{}, cur:null, data:null, profiles:{}, shown:24, cache:{} };
 
 // ---------- helpers
 function hits(tags, wanted){ return wanted.filter(w => [...tags].some(t => w===t || t.split(/\s+/).includes(w))); }
@@ -357,13 +357,12 @@ function spokenStories(rows){ const seen=[]; rows.forEach(r=>{ if(r.story_id && 
 async function boot(){
   try{
     const [ls, names, stories, status, cost] = await Promise.all([api('/api/listeners'), api('/api/briefings'), api('/api/stories'), api('/api/status'), api('/api/cost').catch(()=>({}))]);
+    S.prerank = await api('/api/prerank').catch(()=>({}));
     S.listeners=ls; S.names=names; S.stories=stories; S.status=status; S.cost=cost;
     stories.forEach((s,i)=>{ s.rank=i+1; S.byId[s.story_id]=s; });
     ls.forEach(l=>S.profiles[l.file]=l.profile);
     const ready = status.text_ready; $('#dot').className='dot '+(ready?'on':'off');
     $('#status').textContent = ready ? (status.audio_configured ? 'Pipeline ready · text and voice' : 'Pipeline ready · text only') : 'Setup incomplete';
-    const latest = stories.map(s=>s.published).filter(Boolean).sort().pop();
-    if (latest) $('#edition').textContent = 'Edition · ' + new Intl.DateTimeFormat('en-GB',{day:'numeric',month:'long',year:'numeric',timeZone:'UTC'}).format(new Date(latest));
     // wildcard briefings generated on the page but not saved as listener files
     for (const n of names) if (!S.profiles[n]) { try { S.profiles[n] = (await briefing(n)).profile || {name:n}; } catch {} }
     renderPills(); renderStats(); renderStories(); renderCost(); await renderCompare();
@@ -390,7 +389,7 @@ async function select(f){
   const p=d.profile||{}, s=d.summary||{}, rows=d.sources||[];
   $('#pfor').textContent = `${p.name||f}'s briefing · ${LANG[p.language]||p.language||''}`;
   $('#ptitle').textContent = s.first || 'Briefing';
-  $('#pmeta').innerHTML = [`${s.stories||0} stories`, `${s.minutes||0} min`, `${s.words||0} words`, LANG[s.language]||s.language, `Generated for ${money(s.usd)}`].map(x=>`<span>${esc(x)}</span>`).join('');
+  $('#pmeta').innerHTML = [`${s.stories||0} stories`, `${s.minutes||0} min`, `${s.words||0} words`, LANG[s.language]||s.language, (s.usd_text!=null ? `Script ${money(s.usd_text)} · Voice ${money(s.usd_voice)}` : `Cost ${money(s.usd)}`)].map(x=>`<span>${esc(x)}</span>`).join('');
   $('#notes').href = '#'; $('#notes').onclick = e => { e.preventDefault(); showNotes(d); };
   setupAudio(d);
   renderTranscript(d); renderTrust(d); renderWho(d);
@@ -536,7 +535,8 @@ async function renderCompare(){
 function renderStats(){
   const st=S.stories; const arts=st.reduce((n,s)=>n+s.articles+(s.duplicates||0),0); const tr=st.reduce((n,s)=>n+(s.translations||0),0);
   const dups=st.reduce((n,s)=>n+(s.duplicates||0),0); const conf=st.reduce((n,s)=>n+(s.conflicts||0),0); const facts=st.reduce((n,s)=>n+(s.facts||0),0);
-  $('#stats').innerHTML=[[arts+tr,'articles in the edition'],[tr,'translations folded into the English original'],[st.length,`stories (${dups} duplicate copies merged)`],[facts,`facts extracted · ${conf} disagreements found`]]
+  const pr=S.prerank||{}; const groups=pr.groups||st.length, short=pr.shortlisted||st.length;
+  $('#stats').innerHTML=[[arts+tr,`articles · ${tr} translations folded into the English original`],[groups,`stories after grouping · ${dups} duplicate copies merged`],[short,`stories worth a model call · picked by free signals, ${Math.round(100-short/groups*100)}% never reach a model`],[facts,`facts extracted · ${conf} disagreements found`]]
     .map(([b,s])=>`<div class="stat"><b>${b}</b><span>${s}</span></div>`).join('');
 }
 function renderStories(){

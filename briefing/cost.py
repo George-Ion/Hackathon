@@ -1,6 +1,7 @@
 """Tracks every paid call so we can report full-dataset cost and the 10x estimate (15% of the score).
 Also provides a cumulative spend ledger to enforce the API budget across processes.
 """
+import contextvars
 import json
 import threading
 from collections import defaultdict
@@ -15,6 +16,11 @@ LEDGER_PATH = Path("out") / "spend.log"
 _LEDGER_LOCK = threading.Lock()
 
 
+# Which listener's briefing the current call belongs to (None for shared steps like extraction).
+# Set by make.py; copied into worker threads by verify.py.
+LISTENER = contextvars.ContextVar("listener", default=None)
+
+
 class BudgetExceeded(RuntimeError):
     pass
 
@@ -24,6 +30,7 @@ class CostTracker:
         self.by_step = defaultdict(lambda: {"calls": 0, "in": 0, "out": 0, "usd": 0.0})
         self._lock = threading.Lock()
         self._session_usd = 0.0
+        self.by_listener = defaultdict(lambda: {"text": 0.0, "voice": 0.0})
 
     def _add_usd_session(self, usd):
         # Called with external locks already held where needed
@@ -42,6 +49,8 @@ class CostTracker:
             s["out"] += int(tokens_out)
             s["usd"] += usd
             self._add_usd_session(usd)
+            if LISTENER.get():
+                self.by_listener[LISTENER.get()]["text"] += usd
         # Ledger write outside of lock to minimize contention; the write itself is protected
         log_spend(step, model, usd)
 
@@ -53,7 +62,14 @@ class CostTracker:
             s["in"] += int(chars)
             s["usd"] += usd
             self._add_usd_session(usd)
+            if LISTENER.get():
+                self.by_listener[LISTENER.get()]["voice"] += usd
         log_spend("tts", "elevenlabs", usd)
+
+    def listener_usd(self, name):
+        """Exact spend so far in this process for one listener: {'text': usd, 'voice': usd}."""
+        with self._lock:
+            return dict(self.by_listener[name])
 
     def total(self):
         with self._lock:
@@ -74,6 +90,8 @@ class CostTracker:
                     "usd": float(values.get("usd", 0.0)),
                 }
             # Do not change self._session_usd here; it should only reflect this process
+        if report.get("extract_cap_ratio"):
+            self.extract_cap_ratio = report["extract_cap_ratio"]
 
     def projections(self, measured_articles, listener_runs, full_dataset_articles):
         """Project measured article stages linearly; hold measured listener stages fixed."""
@@ -90,13 +108,28 @@ class CostTracker:
         full_steps, ten_steps = {}, {}
         with self._lock:
             items = list(self.by_step.items())
+        cap = getattr(self, "extract_cap_ratio", None)
         for name, values in items:
-            article_stage = name.startswith("embed (") or name.startswith("extract (")
-            factor = scale if article_stage else 1.0
-            full_steps[name] = round(values["usd"] * factor, 6)
-            ten_steps[name] = round(values["usd"] * factor * (10 if article_stage else 1), 6)
+            if name.startswith("extract (") and cap:
+                # Pre-ranked: extraction covers a shortlist capped by listener count, whatever the volume
+                full, ten = cap, cap
+            elif name.startswith("cluster_confirm ("):
+                # Borderline-pair checks are capped at CONFIRM_MAX_PAIRS per run (10 batches)
+                full = min(scale, 10 / max(1, values.get("calls", 1)))
+                ten = min(scale * 10, 10 / max(1, values.get("calls", 1)))
+            elif name.startswith("embed (") or name.startswith("extract ("):
+                full, ten = scale, scale * 10
+            else:
+                full, ten = 1.0, 1.0
+            full_steps[name] = round(values["usd"] * full, 6)
+            ten_steps[name] = round(values["usd"] * ten, 6)
         return {
-            "method": "Embedding and extraction costs scale with merged article count. Script, verification, and TTS costs stay fixed for the measured listener count.",
+            "method": ("Embeddings scale with article count. With pre-ranking, extraction covers a shortlist capped by "
+                       "the number of listeners (top 12 per listener + top 15 overall), so it does not grow with volume; "
+                       "borderline grouping checks are capped at 200 pairs. Script, verification and voice stay fixed "
+                       "for the measured listener count." if getattr(self, "extract_cap_ratio", None) else
+                       "Embedding and extraction costs scale with merged article count. Script, verification, and TTS "
+                       "costs stay fixed for the measured listener count."),
             "status": "estimated",
             "full_dataset": {
                 "articles": full_dataset_articles,
@@ -150,6 +183,7 @@ class CostTracker:
                     "total_usd": round(sum(s["usd"] for s in steps.values()), 6),
                 },
                 "projections": projection,
+                "extract_cap_ratio": getattr(self, "extract_cap_ratio", None),
             }, f, indent=2)
 
 

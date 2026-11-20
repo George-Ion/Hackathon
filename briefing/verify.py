@@ -1,5 +1,6 @@
 """Trust check (25% of the score): every story segment is checked against its extracted facts.
 Cheap deterministic number check first, then a cheap-model claim check."""
+import contextvars
 import json
 import re
 from concurrent.futures import ThreadPoolExecutor
@@ -103,8 +104,11 @@ def _unmatched_numbers(text, language, source_numbers):
 
 def verify(script, stories, language: str = "en"):
     by_id = {s["story_id"]: s for s in stories}
+    # One context copy per task, so each worker thread keeps the listener tag for cost tracking
+    contexts = [contextvars.copy_context() for _ in script["segments"]]
     with ThreadPoolExecutor(8) as pool:
-        return list(pool.map(lambda seg: _check(seg, by_id, language), script["segments"]))
+        return list(pool.map(lambda pair: pair[0].run(_check, pair[1], by_id, language),
+                             zip(contexts, script["segments"])))
 
 
 def _check(seg, by_id, language: str = "en"):

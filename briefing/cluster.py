@@ -118,5 +118,7 @@ def cluster(articles, threshold=CLUSTER_THRESHOLD, confirm=CLUSTER_CONFIRM, conf
             "articles": [articles[i] for i in kept],
             "duplicate_ids": dupes,
             "n_sources": len({articles[i]["source"] for i in idx}),
+            # unit centroid of the story's articles, reused by prerank (never saved to stories.json)
+            "_vec": (lambda c: c / (np.linalg.norm(c) + 1e-9))(v[idx].mean(axis=0)),
         })
     return stories

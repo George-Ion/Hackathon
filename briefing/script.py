@@ -52,6 +52,36 @@ def write_script(profile, stories):
         ],
     }
     result = validate_script(chat_json("script", LARGE_MODEL, SYSTEM, json.dumps(payload, ensure_ascii=False)), stories)
+    return fit_length(profile, stories, result, payload)
+
+
+def story_payload(stories):
+    return [
+        {
+            "story_id": s["story_id"],
+            "headline": s.get("headline"),
+            "summary": s.get("summary"),
+            "facts": [{"id": f["id"], "text": f["text"],
+                       "outlets": sorted({a["outlet"] for a in s["articles"] if a["id"] in f.get("sources", [])})}
+                      for f in s.get("facts", [])],
+            "conflicts": s.get("conflicts", []),
+        }
+        for s in stories
+    ]
+
+
+def total_words(profile, result):
+    disclosure_words = len(tts.DISCLOSURES.get(profile.get("language", "en"), tts.DISCLOSURES["en"]).split())
+    return sum(len(seg.get("text", "").split()) for seg in result.get("segments", [])) + disclosure_words
+
+
+def fit_length(profile, stories, result, payload=None):
+    """Revise an existing script (at most twice) until its spoken length, disclosure included, is in range.
+    Also used after segment repairs, which can shorten a script below the minimum."""
+    target_total = max(1, int(profile.get("length_minutes", 5) * WORDS_PER_MINUTE))
+    disclosure_words = len(tts.DISCLOSURES.get(profile.get("language", "en"), tts.DISCLOSURES["en"]).split())
+    target_words = max(1, int(target_total * 0.95) - disclosure_words)
+    payload = payload or {"stories": story_payload(stories)}
     # Enforce both sides of the total-length bound (including disclosure). Allow up to 2 revisions.
     low_total, high_total = length_bounds(profile)
     # Stricter internal band we try to hit to improve listening experience

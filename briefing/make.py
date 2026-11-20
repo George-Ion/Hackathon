@@ -4,12 +4,32 @@ import json
 from pathlib import Path
 
 from . import rank, script, sources, tts, verify
-from .cost import COST
+from .cost import COST, LISTENER
 
 
+def _spent(name, base):
+    """Exact script and voice spend for this listener since `base` (a COST.listener_usd snapshot)."""
+    now = COST.listener_usd(name)
+    return round(now["text"] - base["text"], 4), round(now["voice"] - base["voice"], 4)
+
+
+def _tagged(fn):
+    """Run fn with every paid call tagged as belonging to this listener, so its cost is exact
+    even when several briefings are written at the same time."""
+    def wrapper(profile, name, *a, **kw):
+        token = LISTENER.set(name)
+        try:
+            return fn(profile, name, *a, **kw)
+        finally:
+            LISTENER.reset(token)
+    wrapper.__name__, wrapper.__doc__ = fn.__name__, fn.__doc__
+    return wrapper
+
+
+@_tagged
 def make_briefing(profile, name, stories, out, audio=True):
     out = Path(out)
-    usd_before = COST.total()
+    base = COST.listener_usd(name)
     lang = profile.get("language", "en")
     picked = rank.rank_for_listener(stories, profile)
     sc = script.write_script(profile, picked)
@@ -64,6 +84,18 @@ def make_briefing(profile, name, stories, out, audio=True):
             if not bad:
                 break
 
+    # A repair can shorten the script below the minimum length: fit it, then re-check every segment
+    low, high = script.length_bounds(profile)
+    if not (low <= script.total_words(profile, sc) <= high):
+        try:
+            sc = script.fit_length(profile, picked, sc)
+            report = verify.verify(sc, picked, lang)
+            bad = verify.problems(report)
+            revisions["rounds"].append({"length_fit": script.total_words(profile, sc),
+                                        "remaining": [{"report": r} for r in bad]})
+        except ValueError as e:
+            revisions["rounds"].append({"length_fit_failed": str(e)})
+
     # Build segments and write outputs after any repairs
     segments = tts.segments_with_disclosure(sc, lang)
     text = "\n\n".join(s["text"] for s in segments)
@@ -102,8 +134,7 @@ def make_briefing(profile, name, stories, out, audio=True):
     summary = {
         "name": name, "language": lang, "stories": len(spoken_story_ids), "words": words,
         "minutes": round(words / script.WORDS_PER_MINUTE, 1), "flagged": len(verify.problems(report)) + source_issues,
-        # Approximate when several briefings run at once: the cost tracker is shared
-        "usd": round(COST.total() - usd_before, 4),
+        "usd_text": _spent(name, base)[0], "usd_voice": 0.0, "usd": _spent(name, base)[0],
         "first": picked[0]["headline"] if picked else None,
     }
     (out / f"{name}.summary.json").write_text(json.dumps(summary, indent=2, ensure_ascii=False), encoding="utf-8")
@@ -125,7 +156,8 @@ def make_briefing(profile, name, stories, out, audio=True):
         sources.write(rows, profile.get("name", name), out / f"{name}.sources.json", out / f"{name}.sources.md")
         source_issues = sum(1 for row in rows if row.get("warning"))
         summary["flagged"] = len(verify.problems(report)) + source_issues
-        summary["usd"] = round(COST.total() - usd_before, 4)
+        summary["usd_text"], summary["usd_voice"] = _spent(name, base)
+        summary["usd"] = round(summary["usd_text"] + summary["usd_voice"], 4)
         (out / f"{name}.summary.json").write_text(json.dumps(summary, indent=2, ensure_ascii=False), encoding="utf-8")
     return summary
 
@@ -157,10 +189,12 @@ def validate_saved_briefing(profile, name, stories, out):
     return {"script": sc, "report": report, "segments": segments, "words": words, "picked": picked}
 
 
+@_tagged
 def synthesize_saved_briefing(profile, name, stories, out):
     """Create audio and source timings from an existing, verified text edition."""
     out = Path(out)
-    usd_before = COST.total()
+    base = COST.listener_usd(name)
+    prior = json.loads((out / f"{name}.summary.json").read_text(encoding="utf-8")) if (out / f"{name}.summary.json").exists() else {}
     checked = validate_saved_briefing(profile, name, stories, out)
     sc, report = checked["script"], checked["report"]
     segments, words, picked = checked["segments"], checked["words"], checked["picked"]
@@ -179,7 +213,8 @@ def synthesize_saved_briefing(profile, name, stories, out):
         "name": name, "language": lang,
         "stories": len({s.get("story_id") for s in sc.get("segments", []) if s.get("story_id")}),
         "words": words, "minutes": round(words / script.WORDS_PER_MINUTE, 1),
-        "flagged": 0, "usd": round(COST.total() - usd_before, 4),
+        "flagged": 0, "usd_text": prior.get("usd_text"), "usd_voice": _spent(name, base)[1],
+        "usd": round((prior.get("usd_text") or 0) + _spent(name, base)[1], 4),
         "first": picked[0]["headline"] if picked else None,
     }
     (out / f"{name}.summary.json").write_text(json.dumps(summary, indent=2, ensure_ascii=False), encoding="utf-8")

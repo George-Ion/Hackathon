@@ -9,7 +9,7 @@ import json
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
-from briefing import cluster, cost, extract, ingest, make, rank
+from briefing import cluster, cost, extract, ingest, make, prerank, rank
 
 
 def extract_stories_with_retry(stories, out_dir: Path):
@@ -56,7 +56,23 @@ def build_stories(args, out):
     stories = cluster.cluster(articles)
     print(f"{len(stories)} stories after clustering")
 
-    facts, errors = extract_stories_with_retry(stories, out)
+    # Pre-rank with free signals; extract only stories that can reach a briefing
+    profiles = {p.stem: json.loads(p.read_text(encoding="utf-8")) for p in sorted(Path("listeners").glob("*.json"))}
+    if args.extract_all or not profiles:
+        selected = stories
+    else:
+        keep, rows = prerank.shortlist(stories, [s["_vec"] for s in stories], profiles)
+        (out / "prerank.json").write_text(json.dumps({
+            "groups": len(stories), "shortlisted": len(keep), "k_per_listener": prerank.K_PER_LISTENER,
+            "k_global": prerank.K_GLOBAL, "listeners": list(profiles), "stories": rows}, indent=2, ensure_ascii=False),
+            encoding="utf-8")
+        selected = [s for s in stories if s["story_id"] in keep]
+        # Shortlist size is capped by listener count, not article volume: tell the cost projection
+        cap = prerank.K_GLOBAL + prerank.K_PER_LISTENER * len(profiles)
+        cost.COST.extract_cap_ratio = cap / max(1, len(selected))
+    print(f"{len(selected)} of {len(stories)} stories shortlisted for extraction")
+
+    facts, errors = extract_stories_with_retry(selected, out)
     facts.sort(key=rank.global_score, reverse=True)
     (out / "stories.json").write_text(json.dumps(facts, indent=2, ensure_ascii=False), encoding="utf-8")
     if errors:
@@ -72,6 +88,7 @@ def main():
     ap.add_argument("--listener", action="append")
     ap.add_argument("--limit", type=int)
     ap.add_argument("--reuse", action="store_true", help="reuse out/stories.json instead of re-extracting")
+    ap.add_argument("--extract-all", action="store_true", help="skip pre-ranking and extract every story group")
     ap.add_argument("--no-audio", action="store_true")
     ap.add_argument("--audio-only", action="store_true", help="synthesize audio from existing verified scripts without model calls")
     ap.add_argument("--out", default="out")
@@ -179,18 +196,24 @@ def main():
     full_articles, _, _ = ingest.load_articles(args.data)
     full_dataset_articles = len(full_articles)
 
-    if not args.no_audio and not failures:
-        # Validate every listener before any TTS request. Then synthesize serially so
-        # the shared $5 budget check cannot race across concurrent voice requests.
+    if not args.no_audio:
+        # Validate every listener before any TTS request, then synthesize serially so the shared
+        # budget check cannot race. A listener that fails its text or preflight check gets no audio,
+        # but no longer blocks audio for the listeners that passed.
+        failed = {lf for lf, _ in failures}
+        ready = []
         for lf in listener_files:
+            if lf in failed:
+                continue
             try:
                 profile = json.loads(Path(lf).read_text(encoding="utf-8"))
                 make.validate_saved_briefing(profile, Path(lf).stem, facts, out)
+                ready.append(lf)
             except Exception as e:
                 failures.append((lf, e))
                 print(f"[{Path(lf).stem}] PREFLIGHT ERROR: {type(e).__name__}: {e}")
-        if not failures:
-            for lf in listener_files:
+        if ready:
+            for lf in ready:
                 try:
                     profile = json.loads(Path(lf).read_text(encoding="utf-8"))
                     s = make.synthesize_saved_briefing(profile, Path(lf).stem, facts, out)
