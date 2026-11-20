@@ -77,10 +77,25 @@ listener (including the live wildcard), generate a briefing with or without audi
 side by side, click a timestamp to jump in the audio, and expand every claim to see its source links and
 verification flags. The Stories tab shows the clustered and ranked stories.
 
-## Current run (18 Nov, 124 articles, 117 stories, 4 listeners)
-All four verified text briefings and MP3s were generated. Spoken lengths (including the AI disclosure) are Dutch 526/600 words, FX 666/750, German 792/900, and World 408/450; each is within 15% above or below target. The verifier reports zero unresolved flags.
+## Final run (20 Nov, data of 18 Nov: 124 articles, 117 stories, 4 listeners)
+Fresh run from an empty `out/`; `python tools/check_done.py` passes every item (2-8, 10).
 
-Measured run cost is $4.11382: embeddings $0.001, extraction $0.73, scripts $0.52, verification $0.10, and ElevenLabs TTS $2.76282. A separate $0.25 reserve covers verification retries whose per-call usage was not persisted. Estimated full-dataset cost is $12.2374; estimated 10x-volume cost is $91.9281. See `out/cost.json` for the method and stage breakdown.
+| Listener | Language | Stories | Words / target | Verify flags |
+|---|---|---|---|---|
+| fx_trader | en | 7 | 804 / 750 | 0 |
+| world_listener | en | 3 | 410 / 450 | 0 |
+| german_investor | de | 4 | 778 / 900 | 0 |
+| dutch_investor | nl | 4 | 584 / 600 | 0 |
+
+Measured cost (token counts from the API responses, `out/cost.json`): **$4.10** in total.
+- Per day, shared by all listeners: embeddings $0.001 and extraction $0.26.
+- Per listener: scripts $0.53, repair of flagged segments $0.23 and verification $0.04, for 4 listeners together.
+- Voice: ElevenLabs $3.05.
+
+That is about **$0.96 per listener per day**, of which $0.76 is the voice.
+
+Estimates (article stages scale with volume, listener stages stay fixed): full dataset (1,502 articles) **$7.00**;
+10x volume (15,020 articles) **$35.36**.
 
 ## Remaining before submission
 - [ ] Listen to one MP3 per listener and confirm sound quality in Chrome
