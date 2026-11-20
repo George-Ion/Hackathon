@@ -113,7 +113,10 @@ class Handler(SimpleHTTPRequestHandler):
             return self._json([
                 {k: s.get(k) for k in ("story_id", "headline", "topics", "importance", "n_sources", "published")}
                 | {"articles": len(s.get("articles", [])), "facts": len(s.get("facts", [])),
-                   "conflicts": len(s.get("conflicts", []))}
+                   "conflicts": len(s.get("conflicts", [])),
+                   "duplicates": len(s.get("duplicate_ids", [])),
+                   "translations": sum(len(a.get("translations", [])) for a in s.get("articles", [])),
+                   "outlets": sorted({a.get("outlet") for a in s.get("articles", []) if a.get("outlet")})}
                 for s in load_stories()
             ])
         if path.startswith("/api/story/"):
