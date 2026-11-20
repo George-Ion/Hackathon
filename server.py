@@ -137,9 +137,58 @@ class Handler(SimpleHTTPRequestHandler):
         if path.startswith("/out/"):
             f = OUT / Path(path[5:]).name  # flat folder, no traversal
             if f.suffix == ".mp3" and f.exists():
-                data = f.read_bytes()
+                file_size = f.stat().st_size
+                range_header = self.headers.get("Range")
+                # Always advertise byte ranges
+                if range_header:
+                    # Support single-range requests: bytes=start-end, start- or -suffix
+                    m = re.match(r"bytes=(\d*)-(\d*)", range_header)
+                    if m:
+                        start_s, end_s = m.groups()
+                        try:
+                            if start_s == "" and end_s:
+                                # suffix length: last N bytes
+                                length = int(end_s)
+                                if length <= 0:
+                                    raise ValueError
+                                start = max(0, file_size - length)
+                                end = file_size - 1
+                            else:
+                                start = int(start_s or 0)
+                                end = int(end_s) if end_s else file_size - 1
+                                if start < 0 or end < start:
+                                    raise ValueError
+                                if start >= file_size:
+                                    # Not satisfiable
+                                    self.send_response(416)
+                                    self.send_header("Content-Range", f"bytes */{file_size}")
+                                    self.send_header("Accept-Ranges", "bytes")
+                                    self.end_headers()
+                                    return
+                                end = min(end, file_size - 1)
+                            length = end - start + 1
+                        except Exception:
+                            # Malformed; fall back to full content
+                            start, end = 0, file_size - 1
+                            length = file_size
+                            m = None
+                        if m:
+                            with open(f, "rb") as fh:
+                                fh.seek(start)
+                                chunk = fh.read(length)
+                            self.send_response(206)
+                            self.send_header("Content-Type", "audio/mpeg")
+                            self.send_header("Accept-Ranges", "bytes")
+                            self.send_header("Content-Range", f"bytes {start}-{end}/{file_size}")
+                            self.send_header("Content-Length", str(len(chunk)))
+                            self.end_headers()
+                            return self.wfile.write(chunk)
+                # No (valid) Range header: send full file
+                with open(f, "rb") as fh:
+                    data = fh.read()
                 self.send_response(200)
                 self.send_header("Content-Type", "audio/mpeg")
+                self.send_header("Accept-Ranges", "bytes")
                 self.send_header("Content-Length", str(len(data)))
                 self.end_headers()
                 return self.wfile.write(data)
