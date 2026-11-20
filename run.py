@@ -49,9 +49,9 @@ def extract_stories_with_retry(stories, out_dir: Path):
 
 
 def build_stories(args, out):
-    articles, merged = ingest.load_articles(args.data, args.since, args.until)
+    articles, merged, bad_dates = ingest.load_articles(args.data, args.since, args.until)
     articles = articles[: args.limit]
-    print(f"{len(articles)} articles ({merged} translations folded into their English original)")
+    print(f"{len(articles)} articles ({merged} translations folded into their English original, {bad_dates} rows with bad dates skipped)")
 
     stories = cluster.cluster(articles)
     print(f"{len(stories)} stories after clustering")
@@ -117,7 +117,7 @@ def main():
                     print(f"[{Path(lf).stem}] ERROR: {type(e).__name__}: {e}")
                     break
 
-        full_articles, _ = ingest.load_articles(args.data)
+        full_articles, _, _ = ingest.load_articles(args.data)
         full_dataset_articles = len(full_articles)
         print(cost.COST.report(n_articles, listener_runs, full_dataset_articles))
         cost.COST.to_json(out / "cost.json", n_articles, listener_runs, full_dataset_articles)
@@ -176,7 +176,7 @@ def main():
                 print(f"[{Path(jobs[job]).stem}] ERROR: {type(e).__name__}: {e}")
 
     listener_runs = prior_listener_runs + len(listener_files)
-    full_articles, _ = ingest.load_articles(args.data)
+    full_articles, _, _ = ingest.load_articles(args.data)
     full_dataset_articles = len(full_articles)
 
     if not args.no_audio and not failures:

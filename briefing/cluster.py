@@ -9,7 +9,7 @@ from .llm import embed
 def cluster(articles, threshold=CLUSTER_THRESHOLD):
     if not articles:
         return []
-    texts = [f"{a['title']}\n{a['text'][:1500]}" for a in articles]
+    texts = [f"{a['title']}\n{(a['text'] or a['excerpt'] or '')[:1500]}" for a in articles]
     v = np.array(embed(texts), dtype=np.float32)
     v /= np.linalg.norm(v, axis=1, keepdims=True) + 1e-9
     sim = v @ v.T

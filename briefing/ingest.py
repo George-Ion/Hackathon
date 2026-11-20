@@ -44,7 +44,10 @@ def _norm(row, feed):
 def merge_translations(articles):
     """German/Dutch Invezz articles are translations of an English one by the same author,
     published within 15 minutes. Keep the English article and list the others under it,
-    so a story isn't counted as three sources and Dutch/German listeners can get a link in their language."""
+    so a story isn't counted as three sources and Dutch/German listeners can get a link in their language.
+
+    Only match when the author field is non-empty for both records.
+    """
     english = [a for a in articles if a["language"] == "en"]
     kept, merged = [], 0
     for a in articles:
@@ -53,8 +56,16 @@ def merge_translations(articles):
             continue
         # outlet names differ per edition ("Invezz - German" vs "Invezz"), so compare the base name
         base = a["source"].split(" - ")[0]
-        cands = [e for e in english if e["author"] == a["author"] and e["source"].split(" - ")[0] == base
-                 and abs(e["dt"] - a["dt"]) <= TRANSLATION_WINDOW]
+        # Only attempt a match when author is present (non-empty) on both sides
+        if not a.get("author"):
+            kept.append(a)
+            continue
+        cands = [
+            e for e in english
+            if e.get("author") and e["author"] == a["author"]
+            and e["source"].split(" - ")[0] == base
+            and abs(e["dt"] - a["dt"]) <= TRANSLATION_WINDOW
+        ]
         if cands:
             twin = min(cands, key=lambda e: abs(e["dt"] - a["dt"]))
             twin["translations"].append({"id": a["id"], "language": a["language"], "url": a["url"], "title": a["title"]})
@@ -65,17 +76,28 @@ def merge_translations(articles):
 
 
 def load_articles(folder="data/raw", since=None, until=None):
-    """since/until are ISO dates (until is inclusive of that whole day)."""
+    """since/until are ISO dates (until is inclusive of that whole day).
+
+    Returns (articles, merged_translations_count, bad_date_count).
+    """
     lo = datetime.fromisoformat(since + "T00:00:00+00:00") if since else None
     hi = datetime.fromisoformat(until + "T00:00:00+00:00") + timedelta(days=1) if until else None
     articles = []
+    bad_dates = 0
     for p in sorted(Path(folder).rglob("*.jsonl")):
         with open(p, encoding="utf-8") as f:
             for line in f:
-                if line.strip():
-                    a = _norm(json.loads(line), p.stem)
-                    if (lo is None or a["dt"] >= lo) and (hi is None or a["dt"] < hi) and (a["text"] or a["title"]):
-                        articles.append(a)
+                if not line.strip():
+                    continue
+                row = json.loads(line)
+                try:
+                    a = _norm(row, p.stem)
+                except Exception:
+                    # Count rows with bad or missing dates and skip them instead of crashing
+                    bad_dates += 1
+                    continue
+                if (lo is None or a["dt"] >= lo) and (hi is None or a["dt"] < hi) and (a["text"] or a["title"]):
+                    articles.append(a)
     articles, merged = merge_translations(articles)
     articles.sort(key=lambda a: a["dt"])
-    return articles, merged
+    return articles, merged, bad_dates

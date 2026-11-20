@@ -74,7 +74,7 @@ def run_job(job_id, profile, name, audio):
                     len(s.get("articles", [])) + len(s.get("duplicate_ids", [])) for s in load_stories()
                 )
                 listener_runs = measured.get("listeners") or len(list(LISTENERS.glob("*.json")))
-                full_count = len(ingest.load_articles("data/raw")[0])
+                full_count = len(ingest.load_articles("data/raw")[0])  # still ok: we only need the first element
                 COST.to_json(OUT / "cost.json", n_articles, listener_runs, full_count)
             except Exception:
                 traceback.print_exc()
