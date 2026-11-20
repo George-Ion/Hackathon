@@ -192,8 +192,9 @@ def _check(seg, by_id, language: str = "en"):
 
 
 def problems(report):
+    segments = report.get("segments") if isinstance(report, dict) else report
     bad = []
-    for r in report:
+    for r in segments:
         if (r.get("advice_regex") or r.get("investment_advice") or r.get("numbers_not_in_sources")
                 or r.get("missing_fact_ids") or r.get("unknown_fact_ids") or r.get("facts_without_sources")):
             bad.append(r)

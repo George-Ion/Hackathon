@@ -129,3 +129,105 @@ def validate_script(result, stories):
             if unknown:
                 raise ValueError(f"Script segment {i} references unknown facts: {sorted(unknown)}")
     return result
+
+
+REPAIR_SYSTEM = """You repair one spoken news segment. Keep the same strict rules as the main writer:
+- Use ONLY the provided facts for this story; do not introduce any new facts or numbers.
+- It is acceptable to drop a claim if it is not supported, but you must not add new facts.
+- For story segments, keep story_id the same and choose a non-empty subset of the allowed fact ids. Do not add ids.
+- For transition segments (story_id null), do not include any news claims or numbers and return an empty fact_ids array.
+- No investment advice in any language.
+Return JSON: {"story_id": str|null, "fact_ids": [str], "text": str}"""
+
+
+def _summarise_reasons(bad_entry: dict) -> str:
+    reasons = []
+    if bad_entry.get("advice_regex") or bad_entry.get("investment_advice"):
+        reasons.append("remove investment advice")
+    if bad_entry.get("numbers_not_in_sources"):
+        reasons.append("remove or correct numbers not present in sources")
+    if bad_entry.get("missing_fact_ids") or bad_entry.get("unknown_fact_ids"):
+        reasons.append("ensure only provided fact ids are used")
+    if bad_entry.get("facts_without_sources"):
+        reasons.append("avoid citing facts without source articles")
+    if bad_entry.get("claims_without_evidence"):
+        reasons.append("avoid factual claims in transitions without evidence")
+    if bad_entry.get("missing_claim_audit") or bad_entry.get("invalid_claim_audit"):
+        reasons.append("make only supported claims from provided facts")
+    return "; ".join(reasons) or "resolve verifier issues"
+
+
+def revise_segments(profile, stories, sc, bad_with_index):
+    """Rewrite only the flagged segments. Returns (new_script, changed_indices, revision_logs).
+    Each log has: {index, story_id, before:{text,fact_ids}, after:{text,fact_ids}, reason}.
+    """
+    if not bad_with_index:
+        return sc, [], []
+    by_story = {s["story_id"]: s for s in stories}
+    segments = list(sc.get("segments") or [])
+    changed = []
+    logs = []
+    for entry in bad_with_index:
+        i = entry.get("_index")
+        if i is None or not (0 <= i < len(segments)):
+            continue
+        seg = segments[i]
+        sid = seg.get("story_id")
+        allowed_ids = list(seg.get("fact_ids") or [])
+        # Build the limited fact bundle for the model
+        facts = []
+        story = by_story.get(sid) if sid is not None else None
+        if story is not None:
+            by_fid = {f["id"]: f for f in story.get("facts", [])}
+            for fid in allowed_ids:
+                f = by_fid.get(fid)
+                if f:
+                    facts.append({
+                        "id": f["id"],
+                        "text": f.get("text"),
+                        "outlets": sorted({a["outlet"] for a in story.get("articles", []) if a.get("id") in (f.get("sources") or [])})
+                    })
+        payload = {
+            "listener": profile,
+            "story_id": sid,
+            "allowed_fact_ids": allowed_ids,
+            "facts": facts,
+            "conflicts": (story.get("conflicts") if story else []) or [],
+            "current_segment": {"story_id": sid, "fact_ids": allowed_ids, "text": seg.get("text", "")},
+            "issues": _summarise_reasons(entry),
+            "instruction": "Rewrite ONLY this one segment to resolve the issues. Use a subset of allowed_fact_ids; do not add new ids."
+        }
+        repaired = chat_json("script_repair", LARGE_MODEL, REPAIR_SYSTEM, json.dumps(payload, ensure_ascii=False))
+        if not isinstance(repaired, dict):
+            raise ValueError("Repair model returned invalid JSON for segment {}".format(i))
+        new_sid = repaired.get("story_id")
+        new_ids = repaired.get("fact_ids") if isinstance(repaired.get("fact_ids"), list) else []
+        new_text = repaired.get("text") if isinstance(repaired.get("text"), str) else None
+        # Validate constraints
+        if sid is None:
+            if new_sid is not None or any(new_ids) or not new_text or not new_text.strip():
+                raise ValueError("Repair violated transition rules at segment {}".format(i))
+        else:
+            if new_sid != sid:
+                raise ValueError("Repair changed story id at segment {}".format(i))
+            if not new_ids or any(not isinstance(fid, str) for fid in new_ids):
+                raise ValueError("Repair returned invalid or empty fact ids at segment {}".format(i))
+            extra = set(new_ids) - set(allowed_ids)
+            if extra:
+                raise ValueError("Repair introduced new fact ids {} at segment {}".format(sorted(extra), i))
+            if not isinstance(new_text, str) or not new_text.strip():
+                raise ValueError("Repair returned empty text at segment {}".format(i))
+        logs.append({
+            "index": i,
+            "story_id": sid,
+            "before": {"text": seg.get("text", ""), "fact_ids": allowed_ids},
+            "after": {"text": new_text, "fact_ids": new_ids if sid is not None else []},
+            "reason": _summarise_reasons(entry),
+        })
+        # Apply change
+        segments[i] = {"story_id": sid, "fact_ids": (new_ids if sid is not None else []), "text": new_text}
+        changed.append(i)
+    new_script = {"language": sc.get("language"), "segments": segments}
+    # Full script validation to keep story/fact discipline intact
+    validate_script(new_script, stories)
+    return new_script, sorted(set(changed)), logs
