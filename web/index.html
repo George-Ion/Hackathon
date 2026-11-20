@@ -249,6 +249,7 @@ footer{padding:48px 0 64px;border-top:1px solid var(--line);color:var(--dim);fon
         <button class="chip" id="speed">1× speed</button>
         <span class="chip blue">AI-generated voice · disclosed at the start</span>
         <a class="chip" id="notes" target="_blank" rel="noopener">Show notes</a>
+        <button class="btn" id="makevoice" style="display:none;padding:7px 16px;font-size:13px">Make voice</button>
       </div>
     </div>
   </div>
@@ -402,11 +403,22 @@ function setupAudio(d){
   $('#bar').querySelectorAll('.tick').forEach(t=>t.remove());
   if (d.audio){ audio.src=d.audio+'?v='+Date.now(); $('#play').disabled=false; $('#dur').textContent=fmt(total); }
   else { audio.removeAttribute('src'); audio.load(); $('#play').disabled=true; $('#dur').textContent='no audio yet'; }
+  const mv=$('#makevoice'); mv.style.display = d.audio ? 'none' : ''; mv.disabled = !S.status.audio_configured;
+  mv.textContent = S.status.audio_configured ? 'Make voice (ElevenLabs, about 1 min)' : 'Voice not configured';
   if (total) rows.forEach((r,i)=>{ if(i>0 && r.start_s!=null && r.story_id && rows[i-1].story_id!==r.story_id){ const t=document.createElement('i'); t.className='tick'; t.style.left=(r.start_s/total*100)+'%'; $('#bar').appendChild(t);} });
   setIcon();
 }
 function setIcon(){ $('#icon').innerHTML = audio.paused ? '<path d="M8 5v14l11-7z"/>' : '<path d="M6 5h4v14H6zM14 5h4v14h-4z"/>'; }
 $('#play').onclick=()=>{ audio.paused ? audio.play() : audio.pause(); };
+$('#makevoice').onclick=async()=>{
+  const b=$('#makevoice'), name=S.cur, t0=Date.now(); b.disabled=true;
+  const tick=setInterval(()=>{ b.innerHTML=`<span class="spin"></span>Voicing… ${Math.round((Date.now()-t0)/1000)} s`; },500);
+  try{ const {job}=await post('/api/voice',{name});
+    let j; do{ await new Promise(r=>setTimeout(r,1500)); j=await api('/api/jobs/'+job); } while(j.status==='running');
+    clearInterval(tick); if(j.status!=='done') throw Error(j.error||'Voice generation failed');
+    delete S.cache[name]; S.cost=await api('/api/cost').catch(()=>S.cost); renderCost(); await select(name); toast('Voice ready');
+  }catch(e){ clearInterval(tick); b.disabled=false; b.textContent='Make voice'; toast(e.message); }
+};
 audio.onplay=audio.onpause=setIcon;
 audio.onloadedmetadata=()=>{ if(isFinite(audio.duration)) $('#dur').textContent=fmt(audio.duration); };
 audio.ontimeupdate=()=>{

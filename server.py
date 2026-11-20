@@ -55,10 +55,14 @@ def briefing(name):
     }
 
 
-def run_job(job_id, profile, name, audio):
+def run_job(job_id, profile, name, audio, voice_only=False):
     with RUN_LOCK:
         try:
-            JOBS[job_id]["summary"] = make.make_briefing(profile, name, load_stories(), OUT, audio=audio)
+            if voice_only:
+                # ElevenLabs only: voice the saved, verified script; no OpenAI calls
+                JOBS[job_id]["summary"] = make.synthesize_saved_briefing(profile, name, load_stories(), OUT)
+            else:
+                JOBS[job_id]["summary"] = make.make_briefing(profile, name, load_stories(), OUT, audio=audio)
             JOBS[job_id]["status"] = "done"
         except Exception as e:
             traceback.print_exc()
@@ -201,6 +205,15 @@ class Handler(SimpleHTTPRequestHandler):
     def do_POST(self):
         length = int(self.headers.get("Content-Length") or 0)
         body = json.loads(self.rfile.read(length) or b"{}")
+        if self.path == "/api/voice":
+            name = safe_name(body.get("name"))
+            profile = read_json(OUT / f"{name}.profile.json")
+            if not profile or not (OUT / f"{name}.script.json").exists():
+                return self._json({"error": "No saved script for this listener yet: generate the text edition first."}, 400)
+            job_id = uuid.uuid4().hex[:8]
+            JOBS[job_id] = {"status": "running", "name": name}
+            threading.Thread(target=run_job, args=(job_id, profile, name, True, True), daemon=True).start()
+            return self._json({"job": job_id, "name": name})
         if self.path == "/api/generate":
             profile = body.get("profile") or {}
             name = safe_name(body.get("name") or profile.get("name"))

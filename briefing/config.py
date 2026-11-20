@@ -32,3 +32,7 @@ TTS_MODEL = os.getenv("TTS_MODEL", "eleven_v4")
 # Articles whose embeddings are at least this similar are treated as the same event
 # 0.78 tuned by eye on 16-18 Nov: >=0.80 is nearly always the same event, <0.75 is "related topic"
 CLUSTER_THRESHOLD = float(os.getenv("CLUSTER_THRESHOLD", 0.78))
+# Borderline pairs (similarity between CLUSTER_CONFIRM_LOW and CLUSTER_THRESHOLD) are checked by the
+# small model ("same specific event?") before merging. Set CLUSTER_CONFIRM=0 to switch this off.
+CLUSTER_CONFIRM = os.getenv("CLUSTER_CONFIRM", "1") not in ("0", "false", "no", "")
+CLUSTER_CONFIRM_LOW = float(os.getenv("CLUSTER_CONFIRM_LOW", 0.62))
