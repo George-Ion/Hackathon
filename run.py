@@ -91,6 +91,18 @@ def main():
 
     if args.reuse and (out / "stories.json").exists():
         facts = json.loads((out / "stories.json").read_text(encoding="utf-8"))
+        # Repair invalid source ids in-place so --reuse runs have clean data without API calls
+        total_dropped_sources = 0
+        total_dropped_facts = 0
+        for s in facts:
+            before_ds = s.get("dropped_sources", 0)
+            before_df = s.get("dropped_facts", 0)
+            extract.clean_story(s)
+            total_dropped_sources += s.get("dropped_sources", 0) - before_ds
+            total_dropped_facts += s.get("dropped_facts", 0) - before_df
+        if total_dropped_sources or total_dropped_facts:
+            (out / "stories.json").write_text(json.dumps(facts, indent=2, ensure_ascii=False), encoding="utf-8")
+            print(f"Repaired sources in reused stories: -{total_dropped_sources} source refs, -{total_dropped_facts} empty facts")
         prior_cost = json.loads((out / "cost.json").read_text(encoding="utf-8")) if (out / "cost.json").exists() else {}
         cost.COST.restore(prior_cost)
         measured = prior_cost.get("measured", {})

@@ -24,6 +24,83 @@ def article_ref(a):
             "published": a["published"], "language": a["language"], "translations": a["translations"]}
 
 
+def _map_translation_id(source_id, articles_by_id):
+    """Map a translation article id to its English original id if it belongs to this story.
+    If the id is already an English article in this story, keep it. If it is an id of a
+    translation listed under an English article in this story, return that English id.
+    Otherwise return None.
+    """
+    if source_id in articles_by_id:
+        return source_id
+    # check if source_id matches any translation id in this story
+    for eng_id, a in articles_by_id.items():
+        for tr in a.get("translations", []):
+            if tr.get("id") == source_id:
+                return eng_id
+    return None
+
+
+def _filter_sources_list(sources, articles_by_id):
+    kept = []
+    dropped = 0
+    for s in sources or []:
+        mapped = _map_translation_id(s, articles_by_id)
+        if mapped is not None:
+            kept.append(mapped)
+        else:
+            dropped += 1
+    # de-duplicate while preserving order
+    seen = set()
+    deduped = []
+    for s in kept:
+        if s not in seen:
+            deduped.append(s)
+            seen.add(s)
+    return deduped, dropped
+
+
+def _apply_source_filter(extracted_story, articles):
+    """Validate and normalize source ids inside an extracted story structure.
+    - Keep only sources that are articles in this story (mapping translation ids to their English parent id).
+    - Drop any fact (or conflict position) left without valid sources.
+    - Record counts under extracted_story["dropped_sources"] and ["dropped_facts"].
+    Mutates extracted_story in place.
+    """
+    articles_by_id = {a["id"]: a for a in extracted_story.get("articles") or [article_ref(x) for x in articles]}
+    dropped_sources = 0
+    dropped_facts = 0
+
+    # Facts
+    facts = []
+    for f in extracted_story.get("facts", []) or []:
+        new_sources, d = _filter_sources_list(f.get("sources"), articles_by_id)
+        dropped_sources += d
+        if new_sources:
+            f["sources"] = new_sources
+            facts.append(f)
+        else:
+            dropped_facts += 1
+    extracted_story["facts"] = facts
+
+    # Conflicts positions
+    new_conflicts = []
+    for c in extracted_story.get("conflicts", []) or []:
+        new_positions = []
+        for p in c.get("positions", []) or []:
+            new_sources, d = _filter_sources_list(p.get("sources"), articles_by_id)
+            dropped_sources += d
+            if new_sources:
+                p["sources"] = new_sources
+                new_positions.append(p)
+        if new_positions:
+            c["positions"] = new_positions
+            new_conflicts.append(c)
+    extracted_story["conflicts"] = new_conflicts
+
+    extracted_story["dropped_sources"] = dropped_sources
+    extracted_story["dropped_facts"] = dropped_facts
+
+
 def extract_story(story, max_chars=4000):
     docs = [
         {"id": a["id"], "outlet": a["source"], "published": a["published"], "sections": a["sections"],
@@ -42,4 +119,17 @@ def extract_story(story, max_chars=4000):
     out["topics"] = sorted({t.lower() for t in out.get("topics", [])} | sections)
     for i, f in enumerate(out.get("facts", [])):
         f["id"] = f"{sid}.f{i}"
+    # Validate source IDs and drop facts left without valid sources
+    _apply_source_filter(out, story["articles"])  # counts in out["dropped_sources"], out["dropped_facts"]
     return out
+
+
+def clean_story(story):
+    """Repair an already-extracted story in-place by validating source ids against its own article list.
+    - Translate translation ids to their English original id.
+    - Drop facts/positions that end up with no valid sources.
+    Returns the mutated story (convenience for callers).
+    """
+    # Work on a shallow copy of articles already present in the story structure
+    _apply_source_filter(story, [])
+    return story
