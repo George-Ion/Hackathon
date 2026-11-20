@@ -27,7 +27,7 @@ data/raw/**/*.jsonl
 | Making sense of the news (20%) | `ingest.merge_translations`, `cluster.py`, `extract.py`, global ranking |
 | Scalability and cost (15%) | `cost.py` -> `out/cost.json`; the large model is used only for the script step |
 | Listening experience (10%) | Script prompt: greeting, overview, stories, sign-off; hard word limit |
-| Path to product (10%) | Spoken disclosure + show notes with sources; pitch TBD |
+| Path to product (10%) | Spoken disclosure + show notes with sources; `docs/pitch.md` |
 
 ## Setup
 
@@ -114,4 +114,4 @@ come from `.env` too. Check both against your actual plans before quoting them.
 - [ ] Listen to one MP3 per listener and confirm sound quality in Chrome
 - [ ] Get the official listener profiles, answer key, and official releases from Sourcera
 - [ ] Tune `CLUSTER_THRESHOLD` against the answer key
-- [ ] Prepare the pitch: who pays, how it fits a newsroom's day, and how the synthetic voice is disclosed
+- [x] Pitch notes: `docs/pitch.md` (problem, cost, who pays, newsroom day, voice disclosure); slides still to make

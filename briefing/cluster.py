@@ -21,6 +21,7 @@ CONFIRM_BATCH = 20
 DIGEST = re.compile(r"\b(digest|roundup|round-up|wrap|recap|things to know|what to watch|week ahead|morning brief|"
                     r"evening brief|market overview|markets? (today|update)|live (blog|updates)|briefing)\b", re.I)
 CONFIRM_MAX_PAIRS = 200
+MAX_GAP_HOURS = 72
 
 CONFIRM_SYSTEM = """You decide whether pairs of news articles report the SAME SPECIFIC NEWS EVENT.
 Same event: the same announcement, deal, data release, decision, speech, incident or market move,
@@ -71,6 +72,11 @@ def cluster(articles, threshold=CLUSTER_THRESHOLD, confirm=CLUSTER_CONFIRM, conf
     v = np.array(embed(texts), dtype=np.float32)
     v /= np.linalg.norm(v, axis=1, keepdims=True) + 1e-9
     sim = v @ v.T
+    # Same event = close in time. Over a full week, recurring topics ("EUR/USD outlook", "Fed speakers")
+    # look alike every day; articles more than MAX_GAP_HOURS apart never merge.
+    if all(a.get("dt") for a in articles):
+        hours = np.array([a["dt"].timestamp() / 3600 for a in articles])
+        sim[np.abs(hours[:, None] - hours[None, :]) > MAX_GAP_HOURS] = 0.0
 
     # Stage 1. Average-linkage merging, strongest pairs first. Two clusters only merge if their articles
     # are similar ON AVERAGE, which stops chaining (Nvidia earnings -> CoreWeave -> AMD -> ...)
