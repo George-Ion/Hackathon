@@ -3,6 +3,7 @@ import json
 
 from .config import LARGE_MODEL
 from .llm import chat_json
+from . import tts
 
 WORDS_PER_MINUTE = 150
 
@@ -23,9 +24,17 @@ Return JSON: {"language": str, "segments": [{"story_id": str|null, "fact_ids": [
 fact_ids lists every fact id the segment states. Use story_id null and empty fact_ids for greeting/overview/sign-off."""
 
 
+def length_bounds(profile):
+    target = int(profile.get("length_minutes", 5) * WORDS_PER_MINUTE)
+    low, high = int(target * 0.85), int(target * 1.15)
+    return low, high
+
+
 def write_script(profile, stories):
     # Reserve room for the spoken AI disclosure added after script generation.
-    target_words = max(1, int(profile.get("length_minutes", 5) * WORDS_PER_MINUTE) - 25)
+    target_total = max(1, int(profile.get("length_minutes", 5) * WORDS_PER_MINUTE))
+    disclosure_words = len(tts.DISCLOSURES.get(profile.get("language", "en"), tts.DISCLOSURES["en"]).split())
+    target_words = max(1, int(target_total * 0.95) - disclosure_words)
     payload = {
         "listener": profile,
         "target_words": target_words,
@@ -43,24 +52,50 @@ def write_script(profile, stories):
         ],
     }
     result = validate_script(chat_json("script", LARGE_MODEL, SYSTEM, json.dumps(payload, ensure_ascii=False)), stories)
-    # Treat the requested runtime as a hard acceptance rule. Ask the model to shorten
-    # its own draft while preserving fact ids, then fail closed if it still overshoots.
+    # Enforce both sides of the total-length bound (including disclosure). Allow up to 2 revisions.
+    low_total, high_total = length_bounds(profile)
+    # Stricter internal band we try to hit to improve listening experience
+    rev_low_total = int(target_total * 0.90)
+    rev_high_total = int(target_total * 1.10)
     for attempt in range(2):
-        words = sum(len(segment.get("text", "").split()) for segment in result.get("segments", []))
-        if words <= target_words:
+        words_body = sum(len(segment.get("text", "").split()) for segment in result.get("segments", []))
+        total = words_body + disclosure_words
+        # Accept immediately if we're comfortably within the internal band
+        if rev_low_total <= total <= rev_high_total:
             return validate_script(result, stories)
+        # Otherwise, if we're outside the hard band, or just outside the internal one, revise
+        need = "expand" if total < rev_low_total else "shorten"
+        delta = (rev_low_total - total) if need == "expand" else (total - rev_high_total)
+        # Ask the model to stretch or cut while keeping the same story order and fact-id discipline.
+        # Be explicit about not introducing new numbers or any investment advice in any language.
+        instruction = (
+            "Expand this script by about {} words using unused provided facts where helpful. "
+            "Do not invent facts; every claim must be supported by fact_ids from the same story. "
+            "Avoid introducing any new numeric figures not present verbatim in those facts. "
+            "No investment advice (no directives like buy/sell/kopen/verkaufen). "
+            "Keep the same story order and return the same JSON schema."
+            if need == "expand" else
+            "Rewrite this script to reduce by about {} words while preserving only claims supported by the same fact ids. "
+            "Prefer cutting less important details or whole segments to fit. "
+            "Do not add or paraphrase numbers; keep only figures that appear verbatim in the cited facts. "
+            "No investment advice (no directives like buy/sell/kopen/verkaufen). "
+            "Return the same JSON schema."
+        ).format(int(delta))
         revision = {
             "listener": profile,
             "target_words": target_words,
-            "current_word_count": words,
+            "current_word_count": words_body,
             "available_stories_and_facts": payload["stories"],
             "script": result,
-            "instruction": "Rewrite this script to fit the word limit. Preserve only claims supported by the same fact ids. Return the same JSON schema.",
+            "instruction": instruction,
         }
         result = validate_script(chat_json("script_revision", LARGE_MODEL, SYSTEM, json.dumps(revision, ensure_ascii=False)), stories)
-    words = sum(len(segment.get("text", "").split()) for segment in result.get("segments", []))
-    if words > target_words:
-        raise ValueError(f"Generated script is {words} words; limit is {target_words}. No briefing was saved.")
+    # Final check: hard band. We still prefer the internal band but won't fail if inside hard limits.
+    words_body = sum(len(segment.get("text", "").split()) for segment in result.get("segments", []))
+    total = words_body + disclosure_words
+    if not (low_total <= total <= high_total):
+        raise ValueError(
+            f"Generated script is {total} words including disclosure; allowed range is {low_total}-{high_total}. No briefing was saved.")
     return validate_script(result, stories)
 
 

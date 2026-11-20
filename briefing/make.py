@@ -47,6 +47,11 @@ def make_briefing(profile, name, stories, out, audio=True):
     }
     (out / f"{name}.summary.json").write_text(json.dumps(summary, indent=2, ensure_ascii=False), encoding="utf-8")
 
+    # Enforce the same length bounds before generating audio (browser path uses this).
+    low, high = script.length_bounds(profile)
+    if audio and not (low <= words <= high):
+        raise ValueError(f"{name}: {words} words fall outside the ±15% target range ({low}-{high}).")
+
     if audio and (bad or source_issues):
         raise ValueError(
             f"Audio was not generated: {len(bad)} verification flag(s) and "
@@ -79,9 +84,9 @@ def validate_saved_briefing(profile, name, stories, out):
     segments = tts.segments_with_disclosure(sc, lang)
     text = "\n\n".join(s["text"] for s in segments)
     words = len(text.split())
-    target = int(profile.get("length_minutes", 5) * script.WORDS_PER_MINUTE)
-    if not target * 0.85 <= words <= target * 1.15:
-        raise ValueError(f"{name}: {words} words fall outside the ±15% target range.")
+    low, high = script.length_bounds(profile)
+    if not (low <= words <= high):
+        raise ValueError(f"{name}: {words} words fall outside the ±15% target range ({low}-{high}).")
     picked = rank.rank_for_listener(stories, profile)
     rows = sources.build(segments, picked, lang)
     source_issues = sum(1 for row in rows if row.get("warning"))
