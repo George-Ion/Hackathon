@@ -77,25 +77,38 @@ listener (including the live wildcard), generate a briefing with or without audi
 side by side, click a timestamp to jump in the audio, and expand every claim to see its source links and
 verification flags. The Stories tab shows the clustered and ranked stories.
 
-## Final run (20 Nov, data of 18 Nov: 124 articles, 117 stories, 4 listeners)
-Fresh run from an empty `out/`; `python tools/check_done.py` passes every item (2-8, 10).
+## Final run (21 Nov, data of 18 Nov: 124 articles, 4 listeners + 1 live wildcard)
+Fresh run from an empty `out/`. `python tools/check_done.py` passes every item (2-8, 10).
 
-| Listener | Language | Stories | Words / target | Verify flags |
-|---|---|---|---|---|
-| fx_trader | en | 7 | 804 / 750 | 0 |
-| world_listener | en | 3 | 410 / 450 | 0 |
-| german_investor | de | 4 | 778 / 900 | 0 |
-| dutch_investor | nl | 4 | 584 / 600 | 0 |
+**Making sense of the news.** Embedding grouping plus a small-model check of borderline pairs
+(digests and roundups never merge that way) turns 124 articles into **99 stories**. Before, there were 117,
+and 6 stories now combine several outlets instead of 1. Examples: the Anthropic IPO (7 articles), Nvidia
+earnings with the market reaction (10), and the oil report in English, Dutch and German.
 
-Measured cost (token counts from the API responses, `out/cost.json`): **$4.10** in total.
-- Per day, shared by all listeners: embeddings $0.001 and extraction $0.26.
-- Per listener: scripts $0.53, repair of flagged segments $0.23 and verification $0.04, for 4 listeners together.
-- Voice: ElevenLabs $3.05.
+**Pre-ranking.** Free signals (coverage, recency, listener fit by embeddings and interest terms) shortlist
+**36 of 99 stories**. Only those are extracted, so 64% of stories never reach a model.
 
-That is about **$0.96 per listener per day**, of which $0.76 is the voice.
+| Listener | Language | Stories | Words | Script | Voice | Flags |
+|---|---|---|---|---|---|---|
+| fx_trader | en | 6 | 695 | $0.25 | $0.78 | 0 |
+| world_listener | en | 4 | 409 | $0.23 | $0.48 | 0 |
+| german_investor | de | 4 | 843 | $0.11 | $1.03 | 0 |
+| dutch_investor | nl | 4 | 529 | $0.14 | $0.67 | 0 |
+| live wildcard | en | 3 | 405 | $0.16 | $0.47 | 0 |
 
-Estimates (article stages scale with volume, listener stages stay fixed): full dataset (1,502 articles) **$7.00**;
-10x volume (15,020 articles) **$35.36**.
+Per-listener costs are exact: every API call is tagged with the listener it belongs to.
+
+**Cost for the whole edition: $4.42 measured.**
+- Shared steps: embeddings $0.001, grouping check $0.008, extraction of 36 stories $0.09.
+- Per listener: scripts $0.85 and verification $0.04, for all listeners together.
+- Voice: $3.43.
+
+**Estimates:** full dataset (1,502 articles) **$4.51**; 10x volume (15,020 articles) **$4.60**. The
+article-dependent part grows from $0.10 to under $0.30, because extraction is capped by the listener count;
+nearly all of the cost is the voice, which depends on listeners, not articles.
+
+Voice is priced at `TTS_PER_1K_CHARS` ($0.18 per 1,000 characters, set in `.env`), and OpenAI token prices
+come from `.env` too. Check both against your actual plans before quoting them.
 
 ## Remaining before submission
 - [ ] Listen to one MP3 per listener and confirm sound quality in Chrome

@@ -11,8 +11,8 @@ from .llm import chat_json
 NUM = re.compile(
     # Scale words and the abbreviations sources use ("JPY 556.5B", "$1.2bn", "3,5 Mrd.", "2 mln").
     # Longest alternatives first; the scale must not run on into another word ("5 more", "2 Monate").
-    r"(?<![\w])(\d[\d,.]*)(?:\s*(thousand|millions|million|billions|billion|trillion|tausend|millionen|"
-    r"milliarden|milliarde|duizend|miljoen|miljard|bn|mrd|mio|mln|mld|tn|b|m|k)(?![a-zà-ÿ]))?",
+    r"(?<![\w])(\d[\d,.]*)(?:\s*(thousand|millions|million|billions|billion|trillions|trillion|tausend|millionen|billionen|"
+    r"milliarden|milliarde|duizend|miljoen|miljard|biljoen|bio|bln|bn|mrd|mio|mln|mld|tn|b|m|k)(?![a-zà-ÿ]))?",
     re.I,
 )
 SCALES = {
@@ -22,8 +22,12 @@ SCALES = {
     "billion": 1_000_000_000, "billions": 1_000_000_000, "bn": 1_000_000_000, "b": 1_000_000_000,
     "milliarde": 1_000_000_000, "milliarden": 1_000_000_000, "mrd": 1_000_000_000,
     "miljard": 1_000_000_000, "mld": 1_000_000_000,
-    "trillion": 1_000_000_000_000, "tn": 1_000_000_000_000,
+    "trillion": 1_000_000_000_000, "trillions": 1_000_000_000_000, "tn": 1_000_000_000_000,
+    # Dutch and German long scale: "biljoen" / "Billion(en)" / "Bio." mean 10^12, not 10^9
+    "biljoen": 1_000_000_000_000, "billionen": 1_000_000_000_000, "bio": 1_000_000_000_000, "bln": 1_000_000_000_000,
 }
+# In German text the word "Billion" itself is 10^12 (English "billion" is "Milliarde")
+LONG_SCALE = {"de": {"billion": 1_000_000_000_000}}
 ADVICE = re.compile(
     r"\b("
     r"you should (?:buy|sell|invest)"  # EN
@@ -55,11 +59,13 @@ def _parse(token, decimal):
         return None
 
 
-def _tokens(text):
+def _tokens(text, language="en"):
+    long_scale = LONG_SCALE.get((language or "en").lower(), {})
     for match in NUM.finditer(text or ""):
         token = match.group(1).strip(".,")
         if token:
-            yield token, SCALES.get((match.group(2) or "").lower(), 1)
+            word = (match.group(2) or "").lower()
+            yield token, long_scale.get(word, SCALES.get(word, 1))
 
 
 def _round(value, scale):
@@ -72,7 +78,7 @@ def _numbers(text, language: str = "en"):
     When a token has both marks, the last one is the decimal mark whatever the language."""
     default = "," if (language or "en").lower() in {"de", "nl"} else "."
     values = set()
-    for token, scale in _tokens(text):
+    for token, scale in _tokens(text, language):
         if "," in token and "." in token:
             decimal = "." if token.rfind(".") > token.rfind(",") else ","
         else:
@@ -89,7 +95,7 @@ def _unmatched_numbers(text, language, source_numbers):
     language-based reading would flag correct figures; a real mismatch fails every reading."""
     default = "," if (language or "en").lower() in {"de", "nl"} else "."
     missing = set()
-    for token, scale in _tokens(text):
+    for token, scale in _tokens(text, language):
         if "," in token and "." in token:
             preferred = "." if token.rfind(".") > token.rfind(",") else ","
             marks = [preferred]

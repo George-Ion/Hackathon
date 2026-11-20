@@ -82,3 +82,17 @@ class TestUnmatchedNumbers(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class TestLongScale(unittest.TestCase):
+    def test_dutch_biljoen_is_trillion(self):
+        src = verify._numbers("from $1 trillion in 2026 to $1.4 trillion in 2027", "en")
+        self.assertEqual(verify._unmatched_numbers("van 1 biljoen dollar naar 1,4 biljoen", "nl", src), set())
+
+    def test_german_billion_is_trillion(self):
+        src = verify._numbers("$1.4 trillion", "en")
+        self.assertEqual(verify._unmatched_numbers("1,4 Billionen Dollar", "de", src), set())
+        self.assertEqual(verify._unmatched_numbers("1,4 Billion Dollar", "de", src), set())
+
+    def test_english_billion_stays_billion(self):
+        self.assertEqual(verify._numbers("1.4 billion", "en"), {1.4e9})
