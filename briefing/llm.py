@@ -10,7 +10,7 @@ def client():
     global _client
     if _client is None:
         from openai import OpenAI
-        _client = OpenAI()
+        _client = OpenAI(timeout=90, max_retries=3)
     return _client
 
 
@@ -28,6 +28,7 @@ def chat_json(step, model, system, user):
     # Budget gate before the call
     ensure_budget(_estimate_chat_usd(model, system, user), step, model)
     extra = {"reasoning_effort": REASONING[model]} if model in REASONING else {}
+    # First attempt
     r = client().chat.completions.create(
         model=model,
         response_format={"type": "json_object"},
@@ -35,7 +36,23 @@ def chat_json(step, model, system, user):
         **extra,
     )
     COST.add_tokens(step, model, r.usage.prompt_tokens, r.usage.completion_tokens)
-    return json.loads(r.choices[0].message.content)
+    content = r.choices[0].message.content
+    try:
+        return json.loads(content)
+    except Exception:
+        # Retry once on JSON parse error with a second API call
+        r2 = client().chat.completions.create(
+            model=model,
+            response_format={"type": "json_object"},
+            messages=[{"role": "system", "content": system}, {"role": "user", "content": user}],
+            **extra,
+        )
+        COST.add_tokens(step, model, r2.usage.prompt_tokens, r2.usage.completion_tokens)
+        content2 = r2.choices[0].message.content
+        try:
+            return json.loads(content2)
+        except Exception as e:
+            raise ValueError(f"chat_json step '{step}' returned non-JSON twice") from e
 
 
 def _estimate_embed_usd(model: str, texts) -> float:
