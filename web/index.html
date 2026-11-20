@@ -62,9 +62,15 @@ section.block{padding:72px 0;border-top:1px solid var(--line)}
 .play svg{width:28px;height:28px}
 .ptitle{font-size:clamp(20px,2.6vw,28px);font-weight:600;letter-spacing:-.02em;line-height:1.2}
 .pmeta{display:flex;flex-wrap:wrap;gap:8px 16px;color:var(--muted);font-size:13px;margin-top:8px}
-.bar{position:relative;height:6px;border-radius:3px;background:rgba(255,255,255,.12);margin:20px 0 8px;cursor:pointer}
-.bar .fill{position:absolute;inset:0 auto 0 0;width:0;border-radius:3px;background:var(--accent)}
-.bar .tick{position:absolute;top:-4px;width:2px;height:14px;background:rgba(255,255,255,.35);border-radius:1px;pointer-events:none}
+.bar{position:relative;height:30px;margin:8px 0 0;cursor:pointer;touch-action:none;outline:none}
+.track{position:absolute;left:0;right:0;top:12px;height:6px;border-radius:3px;background:rgba(255,255,255,.12);transition:height .15s,top .15s;pointer-events:none}
+.bar:hover .track,.bar.drag .track,.bar:focus-visible .track{top:11px;height:8px}
+.track .fill{position:absolute;inset:0 auto 0 0;width:0;border-radius:3px;background:var(--accent)}
+.track .tick{position:absolute;top:-4px;width:2px;height:calc(100% + 8px);background:rgba(255,255,255,.35);border-radius:1px}
+.thumb{position:absolute;top:50%;left:0;width:16px;height:16px;margin:-8px 0 0 -8px;border-radius:50%;background:#fff;box-shadow:0 0 0 4px rgba(41,151,255,.35);opacity:0;transition:opacity .15s}
+.bar:hover .thumb,.bar.drag .thumb,.bar:focus-visible .thumb{opacity:1}
+.bar .hovert{position:absolute;bottom:30px;transform:translateX(-50%);font-size:11px;background:#1c1c20;border:1px solid var(--line2);border-radius:6px;padding:2px 6px;color:var(--text);pointer-events:none;display:none;font-variant-numeric:tabular-nums}
+.bar:hover .hovert{display:block}
 .ptime{display:flex;justify-content:space-between;font-size:12px;color:var(--dim);font-variant-numeric:tabular-nums}
 .pctl{display:flex;gap:10px;align-items:center;margin-top:14px;flex-wrap:wrap}
 .chip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line2);border-radius:999px;padding:4px 11px;font-size:12px;color:var(--muted);background:transparent}
@@ -242,7 +248,7 @@ footer{padding:48px 0 64px;border-top:1px solid var(--line);color:var(--dim);fon
       <div class="label" id="pfor">Briefing</div>
       <div class="ptitle" id="ptitle">Loading…</div>
       <div class="pmeta" id="pmeta"></div>
-      <div class="bar" id="bar"><div class="fill" id="fill"></div></div>
+      <div class="bar" id="bar" tabindex="0" role="slider" aria-label="Seek" aria-valuemin="0"><div class="track" id="track"><div class="fill" id="fill"></div><i class="thumb" id="thumb"></i></div><span class="hovert" id="hovert"></span></div>
       <div class="ptime"><span id="cur">0:00</span><span id="dur">--:--</span></div>
       <div class="pctl">
         <button class="chip" id="speed">1× speed</button>
@@ -397,14 +403,14 @@ async function select(f){
 
 const audio = $('#audio'); let lastSeg = -1;
 function setupAudio(d){
-  audio.pause(); $('#fill').style.width='0'; $('#cur').textContent='0:00';
+  audio.pause(); $('#fill').style.width='0'; $('#thumb').style.left='0'; $('#cur').textContent='0:00';
   const rows=d.sources||[]; const total = rows.length ? rows[rows.length-1].end_s : null;
-  $('#bar').querySelectorAll('.tick').forEach(t=>t.remove());
+  $('#track').querySelectorAll('.tick').forEach(t=>t.remove());
   if (d.audio){ audio.src=d.audio+'?v='+Date.now(); $('#play').disabled=false; $('#dur').textContent=fmt(total); }
   else { audio.removeAttribute('src'); audio.load(); $('#play').disabled=true; $('#dur').textContent='no audio yet'; }
   const mv=$('#makevoice'); mv.style.display = d.audio ? 'none' : ''; mv.disabled = !S.status.audio_configured;
   mv.textContent = S.status.audio_configured ? 'Make voice (ElevenLabs, about 1 min)' : 'Voice not configured';
-  if (total) rows.forEach((r,i)=>{ if(i>0 && r.start_s!=null && r.story_id && rows[i-1].story_id!==r.story_id){ const t=document.createElement('i'); t.className='tick'; t.style.left=(r.start_s/total*100)+'%'; $('#bar').appendChild(t);} });
+  if (total) rows.forEach((r,i)=>{ if(i>0 && r.start_s!=null && r.story_id && rows[i-1].story_id!==r.story_id){ const t=document.createElement('i'); t.className='tick'; t.style.left=(r.start_s/total*100)+'%'; $('#track').appendChild(t);} });
   setIcon();
 }
 function setIcon(){ $('#icon').innerHTML = audio.paused ? '<path d="M8 5v14l11-7z"/>' : '<path d="M6 5h4v14H6zM14 5h4v14h-4z"/>'; }
@@ -421,12 +427,20 @@ $('#makevoice').onclick=async()=>{
 audio.onplay=audio.onpause=setIcon;
 audio.onloadedmetadata=()=>{ if(isFinite(audio.duration)) $('#dur').textContent=fmt(audio.duration); };
 audio.ontimeupdate=()=>{
-  const d=audio.duration||1; $('#fill').style.width=(audio.currentTime/d*100)+'%'; $('#cur').textContent=fmt(audio.currentTime);
+  const d=audio.duration||1; if(!dragging){ const pc=(audio.currentTime/d*100)+'%'; $('#fill').style.width=pc; $('#thumb').style.left=pc; } $('#cur').textContent=fmt(audio.currentTime);
   const rows=S.data?.sources||[]; const i=rows.findIndex(r=>r.start_s!=null && audio.currentTime>=r.start_s && audio.currentTime<r.end_s);
   document.querySelectorAll('.seg').forEach((el,k)=>el.classList.toggle('active',k===i));
   if (i>=0 && i!==lastSeg){ lastSeg=i; const el=document.querySelectorAll('.seg')[i]; const box=$('#transcript'); if(el && box) box.scrollTo({top:el.offsetTop-box.offsetTop-20,behavior:'smooth'}); }
 };
-$('#bar').onclick=e=>{ if(!audio.src||!audio.duration) return; const r=$('#bar').getBoundingClientRect(); audio.currentTime=(e.clientX-r.left)/r.width*audio.duration; };
+// Seek: click or drag anywhere in the 30px-tall bar; arrow keys skip 10 s
+let dragging=false;
+const frac=e=>{ const r=$('#bar').getBoundingClientRect(); return Math.min(1,Math.max(0,(e.clientX-r.left)/r.width)); };
+const showAt=f=>{ $('#fill').style.width=(f*100)+'%'; $('#thumb').style.left=(f*100)+'%'; $('#cur').textContent=fmt(f*(audio.duration||0)); };
+$('#bar').addEventListener('pointerdown',e=>{ if(!audio.src||!audio.duration) return toast('Make the voice for this listener to listen.'); dragging=true; $('#bar').classList.add('drag'); try{ $('#bar').setPointerCapture(e.pointerId); }catch{} showAt(frac(e)); e.preventDefault(); });
+$('#bar').addEventListener('pointermove',e=>{ const f=frac(e); const ht=$('#hovert'); ht.style.left=(f*100)+'%'; ht.textContent=fmt(f*(audio.duration||0)); if(dragging) showAt(f); });
+const endDrag=e=>{ if(!dragging) return; dragging=false; $('#bar').classList.remove('drag'); audio.currentTime=frac(e)*audio.duration; };
+$('#bar').addEventListener('pointerup',endDrag); $('#bar').addEventListener('pointercancel',()=>{ dragging=false; $('#bar').classList.remove('drag'); });
+$('#bar').addEventListener('keydown',e=>{ if(!audio.duration) return; if(e.key==='ArrowRight'){ audio.currentTime=Math.min(audio.duration,audio.currentTime+10); e.preventDefault(); } if(e.key==='ArrowLeft'){ audio.currentTime=Math.max(0,audio.currentTime-10); e.preventDefault(); } if(e.key===' '){ $('#play').click(); e.preventDefault(); } });
 const speeds=[1,1.25,1.5,0.85]; $('#speed').onclick=()=>{ const i=(speeds.indexOf(audio.playbackRate)+1)%speeds.length; audio.playbackRate=speeds[i]; $('#speed').textContent=`${speeds[i]}× speed`; };
 function seek(t){ if(!audio.src) return toast('Generate audio for this listener to listen.'); audio.currentTime=t; audio.play(); }
 
