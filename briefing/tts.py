@@ -24,6 +24,44 @@ DISCLOSURES = {
 OUTPUT_FORMAT = "mp3_44100_128"
 BYTES_PER_SEC = 128_000 / 8  # constant-bitrate mp3, good enough for timeline offsets
 
+
+_BITRATES = {1: [0, 32, 40, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320],
+             2: [0, 8, 16, 24, 32, 40, 48, 56, 64, 80, 96, 112, 128, 144, 160]}
+_RATES = {3: [44100, 48000, 32000], 2: [22050, 24000, 16000], 0: [11025, 12000, 8000]}
+
+
+def clean_mp3(data: bytes) -> bytes:
+    """Keep only MPEG audio frames: drop ID3 tags and Xing/Info header frames.
+
+    Each ElevenLabs clip starts with its own ID3 tag and an Info frame that states the clip's length
+    and a seek table. Glued together, the first clip's table claims the whole file is a few seconds
+    long, so browsers jump to the wrong place when you skip. Without them the file is plain
+    constant-bitrate MP3, where every second maps to a fixed byte offset."""
+    out, p, n = bytearray(), 0, len(data)
+    while p + 4 <= n:
+        if data[p:p + 3] == b"ID3" and p + 10 <= n:
+            size = (data[p + 6] << 21) | (data[p + 7] << 14) | (data[p + 8] << 7) | data[p + 9]
+            p += 10 + size + (10 if data[p + 5] & 0x10 else 0)
+            continue
+        if data[p:p + 3] == b"TAG" and p + 128 <= n:  # ID3v1 at a clip end
+            p += 128
+            continue
+        b1, b2 = data[p + 1], data[p + 2]
+        if data[p] == 0xFF and (b1 & 0xE0) == 0xE0 and ((b1 >> 1) & 3) == 1:  # frame sync, Layer III
+            ver = (b1 >> 3) & 3
+            br_i, sr_i = b2 >> 4, (b2 >> 2) & 3
+            if ver != 1 and 0 < br_i < 15 and sr_i < 3:
+                br = _BITRATES[1 if ver == 3 else 2][br_i] * 1000
+                sr = _RATES[ver][sr_i]
+                length = (144 if ver == 3 else 72) * br // sr + ((b2 >> 1) & 1)
+                frame = data[p:p + length]
+                if b"Xing" not in frame[:64] and b"Info" not in frame[:64]:
+                    out += frame
+                p += length
+                continue
+        p += 1  # not a frame boundary: resync
+    return bytes(out)
+
 def client():
     # Keep TTS independent of the generated SDK package. Its OpenAPI wheel has
     # very long file names that fail to install on some Windows setups.
@@ -67,7 +105,7 @@ def synthesize_briefing(segments, out_mp3, out_timeline, language="en", voice_id
                 )
                 if not resp.ok:
                     raise RuntimeError(f"ElevenLabs TTS failed ({resp.status_code}): {resp.text[:500]}")
-                audio = resp.content
+                audio = clean_mp3(resp.content)
                 if not audio:
                     raise RuntimeError("ElevenLabs returned an empty audio response.")
                 chars = int(resp.headers.get("x-character-count") or len(seg["text"]))
