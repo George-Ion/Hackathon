@@ -26,6 +26,11 @@ LOGS = ROOT / "agents" / "logs"
 PY = str(ROOT / ".venv" / "Scripts" / "python.exe") if os.name == "nt" else str(ROOT / ".venv" / "bin" / "python")
 
 sys.path.insert(0, str(ROOT))
+for _s in (sys.stdout, sys.stderr):  # Windows consoles/redirects default to cp1252
+    try:
+        _s.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
 from dotenv import load_dotenv  # noqa: E402
 
 load_dotenv(ROOT / ".env")

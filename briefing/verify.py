@@ -32,25 +32,69 @@ statements about the structure of this briefing are not factual news claims. Ret
 array for those phrases. Still report any actual news fact stated in a transition as unsupported."""
 
 
-def _numbers(text):
+def _parse(token, decimal):
+    """Read a digit token with the given decimal mark ('.' or ','); the other mark is a thousands separator."""
+    thousands = "," if decimal == "." else "."
+    try:
+        return float(token.replace(thousands, "").replace(decimal, "."))
+    except ValueError:
+        return None
+
+
+def _tokens(text):
+    for match in NUM.finditer(text or ""):
+        token = match.group(1).strip(".,")
+        if token:
+            yield token, SCALES.get((match.group(2) or "").lower(), 1)
+
+
+def _round(value, scale):
+    # 6 significant figures, so 1.5 billion and "1,5 miljard" compare as equal
+    return float(f"{value * scale:.6g}")
+
+
+def _numbers(text, language: str = "en"):
+    """Numbers in `text`, read the way the language writes them (de/nl: 1.234,5; en: 1,234.5).
+    When a token has both marks, the last one is the decimal mark whatever the language."""
+    default = "," if (language or "en").lower() in {"de", "nl"} else "."
     values = set()
-    for match in NUM.finditer(text):
-        token = match.group(1).strip(".,").replace(",", "")
-        scale = SCALES.get((match.group(2) or "").lower())
-        if scale:
-            number = float(token) * scale
-            token = str(int(number)) if number.is_integer() else f"{number:g}"
-        values.add(token)
+    for token, scale in _tokens(text):
+        if "," in token and "." in token:
+            decimal = "." if token.rfind(".") > token.rfind(",") else ","
+        else:
+            decimal = default
+        value = _parse(token, decimal)
+        if value is not None:
+            values.add(_round(value, scale))
     return values
 
 
-def verify(script, stories):
+def _unmatched_numbers(text, language, source_numbers):
+    """Numbers in a spoken segment that match no source number under ANY plausible reading.
+    Scripts in German or Dutch sometimes keep the English figure format ("$3,770", "2.3%"), so a single
+    language-based reading would flag correct figures; a real mismatch fails every reading."""
+    default = "," if (language or "en").lower() in {"de", "nl"} else "."
+    missing = set()
+    for token, scale in _tokens(text):
+        if "," in token and "." in token:
+            preferred = "." if token.rfind(".") > token.rfind(",") else ","
+            marks = [preferred]
+        else:
+            preferred, marks = default, [".", ","]
+        readings = {_round(v, scale) for v in (_parse(token, m) for m in marks) if v is not None}
+        if readings and not readings & source_numbers:
+            value = _parse(token, preferred)
+            missing.add(_round(value, scale) if value is not None else min(readings))
+    return missing
+
+
+def verify(script, stories, language: str = "en"):
     by_id = {s["story_id"]: s for s in stories}
     with ThreadPoolExecutor(8) as pool:
-        return list(pool.map(lambda seg: _check(seg, by_id), script["segments"]))
+        return list(pool.map(lambda seg: _check(seg, by_id, language), script["segments"]))
 
 
-def _check(seg, by_id):
+def _check(seg, by_id, language: str = "en"):
     sid = seg.get("story_id")
     entry = {"story_id": sid, "advice_regex": bool(ADVICE.search(seg["text"]))}
     if sid is not None and sid not in by_id:
@@ -64,9 +108,28 @@ def _check(seg, by_id):
             entry["missing_fact_ids"] = not bool(ids)
             entry["unknown_fact_ids"] = sorted(ids - {f.get("id") for f in facts.get("facts", [])})
             entry["facts_without_sources"] = [f.get("id") for f in selected if not f.get("sources")]
-        src_nums = _numbers(json.dumps([selected, facts.get("conflicts", [])], ensure_ascii=False))
+        # Build source numbers only from fact texts and conflict claims (facts are in English)
+        src_texts = []
+        for f in selected:
+            t = f.get("text")
+            if isinstance(t, str):
+                src_texts.append(t)
+        for c in facts.get("conflicts", []) or []:
+            for p in c.get("positions", []) or []:
+                cl = p.get("claim")
+                if isinstance(cl, str):
+                    src_texts.append(cl)
+        src_text = "\n".join(src_texts)
+        src_nums = _numbers(src_text, language="en")
+        # Years in the articles' publish dates are fine to say ("this year, 2026"); other years must be in the facts
+        published_years = set()
+        for a in facts.get("articles", []) or []:
+            m = re.search(r"\b(19\d{2}|20\d{2}|2100)\b", str(a.get("published") or ""))
+            if m:
+                published_years.add(float(m.group(1)))
         # Numbers spoken as words won't match; this catches the obvious digit cases
-        entry["numbers_not_in_sources"] = sorted(_numbers(seg["text"]) - src_nums)
+        entry["numbers_not_in_sources"] = sorted(
+            _unmatched_numbers(seg.get("text", ""), language, src_nums | published_years))
         checked = chat_json("verify", CHEAP_MODEL, SYSTEM, json.dumps(
             {"segment": seg["text"], "segment_type": "transition" if sid is None else "news story",
              "facts": selected, "conflicts": facts.get("conflicts", [])},
