@@ -1,0 +1,11 @@
+{
+  "name": "Katrin",
+  "description": "Retired engineer in Cologne. Invests in ETFs, gold and energy. Prefers German and a calm, thorough explanation.",
+  "language": "de",
+  "interests": ["commodities", "gold", "precious metals", "energy", "oil", "etf", "eurozone", "ecb", "inflation", "germany"],
+  "avoid": ["crypto", "games", "entertainment", "royals", "sports"],
+  "depth": "thorough: background and cause and effect, fewer stories",
+  "length_minutes": 6,
+  "max_stories": 4,
+  "tone": "calm and measured"
+}

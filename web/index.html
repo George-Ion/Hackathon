@@ -1,0 +1,239 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Briefing Lab</title>
+<style>
+:root {
+  --bg: #f6f5f2; --panel: #ffffff; --ink: #1c1d21; --muted: #6b6e76; --line: #e3e1dc;
+  --accent: #2a5bd7; --accent-ink: #fff; --ok: #1f7a4d; --warn: #b4540a; --bad: #b42323;
+  --chip: #eef0f5; --hl: #fff6d6;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #131417; --panel: #1b1d22; --ink: #e8e9ec; --muted: #9a9ea8; --line: #2c2f36;
+    --accent: #6c93ff; --accent-ink: #0d1020; --ok: #4cc38a; --warn: #f0a050; --bad: #ff6b6b;
+    --chip: #262a33; --hl: #3a3420;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+header { padding: 16px 24px; border-bottom: 1px solid var(--line); display: flex; gap: 16px; align-items: baseline; flex-wrap: wrap; }
+header h1 { font-size: 18px; margin: 0; }
+header .meta { color: var(--muted); font-size: 13px; }
+main { display: grid; grid-template-columns: 340px 1fr; gap: 20px; padding: 20px 24px; }
+@media (max-width: 900px) { main { grid-template-columns: 1fr; padding: 16px; } }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px; }
+h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin: 0 0 10px; }
+.listeners { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+button { font: inherit; border: 1px solid var(--line); background: var(--panel); color: var(--ink); border-radius: 7px; padding: 6px 10px; cursor: pointer; }
+button:hover { border-color: var(--accent); }
+button.on { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); width: 100%; padding: 9px; font-weight: 600; }
+button:disabled { opacity: .5; cursor: progress; }
+textarea { width: 100%; height: 300px; font: 12.5px/1.45 ui-monospace, Consolas, monospace; background: var(--bg); color: var(--ink); border: 1px solid var(--line); border-radius: 7px; padding: 10px; resize: vertical; }
+label { display: flex; gap: 8px; align-items: center; font-size: 14px; margin: 8px 0; }
+.status { font-size: 13px; color: var(--muted); margin-top: 10px; min-height: 20px; }
+.status.err { color: var(--bad); }
+.tabs { display: flex; gap: 6px; margin-bottom: 14px; flex-wrap: wrap; }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 16px; }
+@media (max-width: 500px) { .grid { grid-template-columns: 1fr; } }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px; min-width: 0; }
+.card h3 { margin: 0 0 4px; font-size: 16px; display: flex; justify-content: space-between; gap: 8px; }
+.card h3 button { font-size: 12px; padding: 2px 8px; }
+.desc { color: var(--muted); font-size: 13px; margin-bottom: 10px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+.chip { background: var(--chip); border-radius: 99px; padding: 2px 9px; font-size: 12.5px; }
+.chip.ok { color: var(--ok); } .chip.bad { color: var(--bad); }
+audio { width: 100%; margin-bottom: 10px; }
+.seg { border-top: 1px solid var(--line); padding: 10px 0; }
+.seg.playing { background: var(--hl); margin: 0 -16px; padding: 10px 16px; }
+.seg .t { font: 12px ui-monospace, Consolas, monospace; color: var(--accent); cursor: pointer; margin-right: 6px; }
+.seg .flag { font-size: 12px; color: var(--bad); margin-top: 4px; }
+details { margin-top: 6px; font-size: 13px; }
+summary { cursor: pointer; color: var(--muted); }
+.claim { margin: 6px 0 0 4px; }
+.claim a { color: var(--accent); text-decoration: none; }
+.claim a:hover { text-decoration: underline; }
+.src { font-size: 12.5px; color: var(--muted); margin-left: 12px; }
+.conflict { color: var(--warn); font-size: 12.5px; margin-top: 4px; }
+table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { color: var(--muted); font-weight: 500; font-size: 12px; text-transform: uppercase; }
+td.num { text-align: right; font-variant-numeric: tabular-nums; }
+.empty { color: var(--muted); padding: 20px 0; }
+.wrap { overflow-x: auto; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Briefing Lab</h1>
+  <span class="meta" id="meta">loading…</span>
+</header>
+<main>
+  <section class="panel">
+    <h2>Listener</h2>
+    <div class="listeners" id="listeners"></div>
+    <textarea id="profile" spellcheck="false"></textarea>
+    <label><input type="checkbox" id="audio"> Generate audio (uses ElevenLabs credits)</label>
+    <label><input type="checkbox" id="save"> Save as a listener file</label>
+    <button class="primary" id="go">Generate briefing</button>
+    <div class="status" id="status"></div>
+  </section>
+
+  <section>
+    <div class="tabs">
+      <button class="on" data-tab="briefings">Briefings</button>
+      <button data-tab="stories">Stories</button>
+    </div>
+    <div id="tab-briefings">
+      <div class="tabs" id="saved"></div>
+      <div class="grid" id="cards"><div class="empty">Pick saved briefings above to compare them side by side, or generate one.</div></div>
+    </div>
+    <div id="tab-stories" hidden>
+      <div class="panel wrap"><table id="stories"></table></div>
+    </div>
+  </section>
+</main>
+
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const api = async (p, opt) => { const r = await fetch(p, opt); const j = await r.json(); if (!r.ok) throw new Error(j.error || r.statusText); return j; };
+const shown = [];  // names of briefings on screen, max 2 for comparison
+
+const WILDCARD = {
+  name: "Wildcard",
+  description: "Describe the wildcard listener the jury hands out",
+  language: "en",
+  interests: [],
+  avoid: [],
+  depth: "medium",
+  length_minutes: 4,
+  max_stories: 5,
+  tone: "friendly"
+};
+
+let listeners = [];
+async function loadListeners() {
+  listeners = await api("/api/listeners");
+  $("#listeners").innerHTML = listeners.map((l, i) =>
+    `<button data-i="${i}">${esc(l.profile.name)} · ${esc(l.profile.language)}</button>`).join("") +
+    `<button data-i="w">+ Wildcard</button>`;
+  $("#listeners").onclick = e => {
+    const b = e.target.closest("button"); if (!b) return;
+    [...$("#listeners").children].forEach(x => x.classList.toggle("on", x === b));
+    const p = b.dataset.i === "w" ? WILDCARD : listeners[+b.dataset.i].profile;
+    $("#profile").value = JSON.stringify(p, null, 2);
+  };
+  $("#listeners").firstElementChild?.click();
+}
+
+async function loadSaved() {
+  const names = await api("/api/briefings");
+  $("#saved").innerHTML = names.length ? names.map(n =>
+    `<button data-n="${esc(n)}" class="${shown.includes(n) ? "on" : ""}">${esc(n)}</button>`).join("")
+    : `<span class="desc">No briefings yet.</span>`;
+}
+$("#saved").onclick = e => { const b = e.target.closest("button"); if (b) toggle(b.dataset.n); };
+
+function toggle(name, force) {
+  const i = shown.indexOf(name);
+  if (i >= 0 && !force) shown.splice(i, 1);
+  else if (i < 0) { shown.push(name); if (shown.length > 2) shown.shift(); }
+  renderCards(); loadSaved();
+}
+
+async function renderCards() {
+  if (!shown.length) { $("#cards").innerHTML = `<div class="empty">Pick saved briefings above to compare them side by side, or generate one.</div>`; return; }
+  const data = await Promise.all(shown.map(n => api("/api/briefing/" + encodeURIComponent(n))));
+  $("#cards").innerHTML = data.map(card).join("");
+  data.forEach(b => wireAudio(b));
+}
+
+function card(b) {
+  const s = b.summary, p = b.profile;
+  const flagsBySeg = {};  // verify has no disclosure segment, sources does: offset by 1
+  b.verify.forEach((v, i) => {
+    const bad = (v.claims || []).filter(c => c.verdict !== "supported").map(c => `${c.verdict}: ${c.claim}`);
+    if (v.numbers_not_in_sources?.length) bad.push("numbers not in sources: " + v.numbers_not_in_sources.join(", "));
+    if (v.advice_regex || v.investment_advice) bad.push("possible investment advice");
+    if (bad.length) flagsBySeg[i + 1] = bad;
+  });
+  const segs = b.sources.map((r, i) => `
+    <div class="seg" id="${esc(b.name)}-seg-${i}" data-start="${r.start_s ?? ""}" data-end="${r.end_s ?? ""}">
+      ${r.start_s != null ? `<span class="t" data-seek="${r.start_s}">${fmt(r.start_s)}</span>` : ""}${esc(r.text)}
+      ${(flagsBySeg[i] || []).map(f => `<div class="flag">⚑ ${esc(f)}</div>`).join("")}
+      ${(r.conflicts || []).map(c => `<div class="conflict">Sources disagree: ${esc(c.issue)}</div>`).join("")}
+      ${r.claims.length ? `<details><summary>${r.claims.length} claim${r.claims.length > 1 ? "s" : ""} · sources</summary>
+        ${r.claims.map(c => `<div class="claim">${esc(c.fact || c.fact_id)}
+          ${c.sources.map(x => `<div class="src"><a href="${esc(x.url)}" target="_blank" rel="noopener">${esc(x.outlet)}: ${esc(x.title)}</a> · ${esc((x.published || "").slice(0, 10))}</div>`).join("")}
+        </div>`).join("")}</details>` : ""}
+    </div>`).join("");
+  return `<div class="card" data-name="${esc(b.name)}">
+    <h3>${esc(p.name || b.name)} <button onclick="toggle('${esc(b.name)}')">close</button></h3>
+    <div class="desc">${esc(p.description || "")}</div>
+    <div class="chips">
+      <span class="chip">${esc(s.language)}</span>
+      <span class="chip">${s.stories} stories</span>
+      <span class="chip">${s.words} words · ~${s.minutes} min</span>
+      <span class="chip ${s.flagged ? "bad" : "ok"}">${s.flagged} flagged</span>
+      <span class="chip">$${(s.usd ?? 0).toFixed(3)}</span>
+    </div>
+    ${b.audio ? `<audio controls preload="metadata" src="${b.audio}?v=${Date.now()}"></audio>` : `<div class="desc">Text only (no audio generated).</div>`}
+    ${segs}
+  </div>`;
+}
+
+function wireAudio(b) {
+  const el = document.querySelector(`.card[data-name="${CSS.escape(b.name)}"]`);
+  const audio = el.querySelector("audio");
+  el.querySelectorAll("[data-seek]").forEach(t => t.onclick = () => { if (audio) { audio.currentTime = +t.dataset.seek; audio.play(); } });
+  if (!audio) return;
+  audio.ontimeupdate = () => el.querySelectorAll(".seg").forEach(s =>
+    s.classList.toggle("playing", s.dataset.start !== "" && audio.currentTime >= +s.dataset.start && audio.currentTime < +s.dataset.end));
+}
+
+const fmt = s => `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
+
+$("#go").onclick = async () => {
+  let profile;
+  try { profile = JSON.parse($("#profile").value); } catch (e) { return status("Profile is not valid JSON: " + e.message, true); }
+  $("#go").disabled = true;
+  status("Ranking, writing and checking the script…" + ($("#audio").checked ? " then recording audio." : ""));
+  const t0 = Date.now();
+  try {
+    const { job, name } = await api("/api/generate", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ profile, audio: $("#audio").checked, save: $("#save").checked }) });
+    let j;
+    do { await new Promise(r => setTimeout(r, 2000)); j = await api("/api/jobs/" + job);
+         status(`Working… ${Math.round((Date.now() - t0) / 1000)}s`); } while (j.status === "running");
+    if (j.status === "error") throw new Error(j.error);
+    status(`Done in ${Math.round((Date.now() - t0) / 1000)}s.`);
+    if ($("#save").checked) loadListeners();
+    toggle(name, true);
+  } catch (e) { status(e.message, true); }
+  $("#go").disabled = false;
+};
+const status = (m, err) => { $("#status").textContent = m; $("#status").classList.toggle("err", !!err); };
+
+document.querySelectorAll("[data-tab]").forEach(b => b.onclick = () => {
+  document.querySelectorAll("[data-tab]").forEach(x => x.classList.toggle("on", x === b));
+  $("#tab-briefings").hidden = b.dataset.tab !== "briefings";
+  $("#tab-stories").hidden = b.dataset.tab !== "stories";
+});
+
+async function loadStories() {
+  const st = await api("/api/stories");
+  $("#meta").textContent = st.length ? `${st.length} stories from ${st.reduce((a, s) => a + s.articles, 0)} articles` : "No stories yet: run python run.py first";
+  $("#stories").innerHTML = `<tr><th>#</th><th>Story</th><th>Topics</th><th>Imp.</th><th>Outlets</th><th>Arts</th><th>Facts</th></tr>` +
+    st.slice(0, 150).map((s, i) => `<tr><td class="num">${i + 1}</td><td>${esc(s.headline)}${s.conflicts ? ` <span class="conflict">· ${s.conflicts} conflict</span>` : ""}</td>
+      <td>${(s.topics || []).slice(0, 5).map(t => `<span class="chip">${esc(t)}</span>`).join(" ")}</td>
+      <td class="num">${s.importance ?? ""}</td><td class="num">${s.n_sources}</td><td class="num">${s.articles}</td><td class="num">${s.facts}</td></tr>`).join("");
+}
+
+loadListeners(); loadSaved(); loadStories();
+</script>
+</body>
+</html>

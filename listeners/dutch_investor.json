@@ -1,0 +1,11 @@
+{
+  "name": "Daan",
+  "description": "Private investor in Maastricht with a portfolio of tech stocks and some crypto. Listens in Dutch on the way to work.",
+  "language": "nl",
+  "interests": ["stock market", "tech", "ai", "artificial intelligence", "crypto", "bitcoin", "earnings", "nvidia"],
+  "avoid": ["entertainment", "royals", "games", "crime"],
+  "depth": "medium: key numbers and what moved, short context",
+  "length_minutes": 4,
+  "max_stories": 5,
+  "tone": "friendly, conversational"
+}

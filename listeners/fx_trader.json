@@ -1,0 +1,11 @@
+{
+  "name": "Mark",
+  "description": "FX trader in London. Listens at 6:30 before the European open. Wants central banks, macro data and currency moves, with the exact figures.",
+  "language": "en",
+  "interests": ["fed", "ecb", "boj", "rba", "rbnz", "forex", "eur/usd", "usd", "inflation", "interest rates", "market overview", "live comments", "eurozone", "japan"],
+  "avoid": ["entertainment", "royals", "games", "crime", "sports"],
+  "depth": "dense and technical: levels, data surprises versus expectations, who said what",
+  "length_minutes": 5,
+  "max_stories": 7,
+  "tone": "fast, crisp, no small talk"
+}

@@ -1,0 +1,11 @@
+{
+  "name": "Emma",
+  "description": "Nurse who just wants to know what happened in the world while she gets ready. Not into markets.",
+  "language": "en",
+  "interests": ["world", "politics", "uk", "trending", "technology", "science", "ai"],
+  "avoid": ["trading ideas", "brokers", "smart beta etf", "fundamental analysis"],
+  "depth": "plain words, explain why it matters, no jargon or market levels",
+  "length_minutes": 3,
+  "max_stories": 4,
+  "tone": "warm and calm"
+}

@@ -1,0 +1,5 @@
+openai>=1.50
+numpy>=2.0
+python-dotenv>=1.0
+requests>=2.32
+elevenlabs>=2.0
