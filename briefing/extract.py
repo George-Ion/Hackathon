@@ -11,6 +11,8 @@ SYSTEM = """You extract facts from news articles about ONE event. Rules:
 - topics: short lowercase tags, e.g. "fed", "forex", "eur/usd", "crypto", "bitcoin", "stocks", "earnings",
   "ai", "commodities", "oil", "gold", "politics", "world", "uk", "crime", "entertainment", "sports".
 - importance: 1-10 for a general business audience (market impact, novelty, people affected).
+- Keep the briefing usable: return at most 6 distinct, high-value facts for the event. Prefer facts with
+  exact figures, consequences, or useful context; do not restate the headline as a fact.
 Return JSON: {"headline": str, "summary": str, "topics": [str], "region": str,
 "facts": [{"text": str, "sources": [id]}], "conflicts": [{"issue": str, "positions": [{"claim": str, "sources": [id]}]}],
 "importance": int}"""

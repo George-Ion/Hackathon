@@ -1,7 +1,5 @@
 import json
 
-from openai import OpenAI
-
 from .config import EMBED_MODEL, REASONING
 from .cost import COST
 
@@ -11,6 +9,7 @@ _client = None
 def client():
     global _client
     if _client is None:
+        from openai import OpenAI
         _client = OpenAI()
     return _client
 

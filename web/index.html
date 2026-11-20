@@ -1,239 +1,41 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Briefing Lab</title>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#f5f4ef"><title>Briefing — The Liquid Briefing</title>
 <style>
-:root {
-  --bg: #f6f5f2; --panel: #ffffff; --ink: #1c1d21; --muted: #6b6e76; --line: #e3e1dc;
-  --accent: #2a5bd7; --accent-ink: #fff; --ok: #1f7a4d; --warn: #b4540a; --bad: #b42323;
-  --chip: #eef0f5; --hl: #fff6d6;
-}
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #131417; --panel: #1b1d22; --ink: #e8e9ec; --muted: #9a9ea8; --line: #2c2f36;
-    --accent: #6c93ff; --accent-ink: #0d1020; --ok: #4cc38a; --warn: #f0a050; --bad: #ff6b6b;
-    --chip: #262a33; --hl: #3a3420;
-  }
-}
-* { box-sizing: border-box; }
-body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
-header { padding: 16px 24px; border-bottom: 1px solid var(--line); display: flex; gap: 16px; align-items: baseline; flex-wrap: wrap; }
-header h1 { font-size: 18px; margin: 0; }
-header .meta { color: var(--muted); font-size: 13px; }
-main { display: grid; grid-template-columns: 340px 1fr; gap: 20px; padding: 20px 24px; }
-@media (max-width: 900px) { main { grid-template-columns: 1fr; padding: 16px; } }
-.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px; }
-h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin: 0 0 10px; }
-.listeners { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
-button { font: inherit; border: 1px solid var(--line); background: var(--panel); color: var(--ink); border-radius: 7px; padding: 6px 10px; cursor: pointer; }
-button:hover { border-color: var(--accent); }
-button.on { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
-button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); width: 100%; padding: 9px; font-weight: 600; }
-button:disabled { opacity: .5; cursor: progress; }
-textarea { width: 100%; height: 300px; font: 12.5px/1.45 ui-monospace, Consolas, monospace; background: var(--bg); color: var(--ink); border: 1px solid var(--line); border-radius: 7px; padding: 10px; resize: vertical; }
-label { display: flex; gap: 8px; align-items: center; font-size: 14px; margin: 8px 0; }
-.status { font-size: 13px; color: var(--muted); margin-top: 10px; min-height: 20px; }
-.status.err { color: var(--bad); }
-.tabs { display: flex; gap: 6px; margin-bottom: 14px; flex-wrap: wrap; }
-.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 16px; }
-@media (max-width: 500px) { .grid { grid-template-columns: 1fr; } }
-.card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px; min-width: 0; }
-.card h3 { margin: 0 0 4px; font-size: 16px; display: flex; justify-content: space-between; gap: 8px; }
-.card h3 button { font-size: 12px; padding: 2px 8px; }
-.desc { color: var(--muted); font-size: 13px; margin-bottom: 10px; }
-.chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
-.chip { background: var(--chip); border-radius: 99px; padding: 2px 9px; font-size: 12.5px; }
-.chip.ok { color: var(--ok); } .chip.bad { color: var(--bad); }
-audio { width: 100%; margin-bottom: 10px; }
-.seg { border-top: 1px solid var(--line); padding: 10px 0; }
-.seg.playing { background: var(--hl); margin: 0 -16px; padding: 10px 16px; }
-.seg .t { font: 12px ui-monospace, Consolas, monospace; color: var(--accent); cursor: pointer; margin-right: 6px; }
-.seg .flag { font-size: 12px; color: var(--bad); margin-top: 4px; }
-details { margin-top: 6px; font-size: 13px; }
-summary { cursor: pointer; color: var(--muted); }
-.claim { margin: 6px 0 0 4px; }
-.claim a { color: var(--accent); text-decoration: none; }
-.claim a:hover { text-decoration: underline; }
-.src { font-size: 12.5px; color: var(--muted); margin-left: 12px; }
-.conflict { color: var(--warn); font-size: 12.5px; margin-top: 4px; }
-table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
-th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
-th { color: var(--muted); font-weight: 500; font-size: 12px; text-transform: uppercase; }
-td.num { text-align: right; font-variant-numeric: tabular-nums; }
-.empty { color: var(--muted); padding: 20px 0; }
-.wrap { overflow-x: auto; }
-</style>
-</head>
-<body>
-<header>
-  <h1>Briefing Lab</h1>
-  <span class="meta" id="meta">loading…</span>
-</header>
-<main>
-  <section class="panel">
-    <h2>Listener</h2>
-    <div class="listeners" id="listeners"></div>
-    <textarea id="profile" spellcheck="false"></textarea>
-    <label><input type="checkbox" id="audio"> Generate audio (uses ElevenLabs credits)</label>
-    <label><input type="checkbox" id="save"> Save as a listener file</label>
-    <button class="primary" id="go">Generate briefing</button>
-    <div class="status" id="status"></div>
-  </section>
-
-  <section>
-    <div class="tabs">
-      <button class="on" data-tab="briefings">Briefings</button>
-      <button data-tab="stories">Stories</button>
-    </div>
-    <div id="tab-briefings">
-      <div class="tabs" id="saved"></div>
-      <div class="grid" id="cards"><div class="empty">Pick saved briefings above to compare them side by side, or generate one.</div></div>
-    </div>
-    <div id="tab-stories" hidden>
-      <div class="panel wrap"><table id="stories"></table></div>
-    </div>
-  </section>
-</main>
-
+:root{--paper:#f5f4ef;--card:#fffefa;--ink:#17221e;--muted:#69746e;--line:#dce2db;--green:#185c46;--lime:#d7f36b;--soft:#e9eee6;--red:#a74437;--gold:#a66c23;--shadow:0 18px 55px #14251b12;--serif:Georgia,'Times New Roman',serif;--sans:Inter,ui-sans-serif,system-ui,'Segoe UI',sans-serif}*{box-sizing:border-box}body{margin:0;background:var(--paper);color:var(--ink);font:15px/1.55 var(--sans)}button,input,textarea,select{font:inherit}button{cursor:pointer}a{color:var(--green)}.shell{min-height:100vh;display:grid;grid-template-columns:250px minmax(0,1fr)}aside{background:#172b24;color:#f6f7ef;padding:28px 18px;display:flex;flex-direction:column;gap:28px}.brand{display:flex;align-items:center;gap:11px;padding:0 8px}.mark{width:34px;height:34px;border-radius:11px;background:var(--lime);color:#172b24;display:grid;place-items:center;font-weight:900;font-size:18px}.brand b{font:600 15px var(--sans);letter-spacing:.02em}.brand small{display:block;color:#afbbb3;font-size:11px;letter-spacing:.11em;text-transform:uppercase}.nav{display:grid;gap:5px}.nav button{border:0;background:transparent;color:#c6d0c9;text-align:left;border-radius:10px;padding:11px 12px}.nav button.active,.nav button:hover{background:#ffffff15;color:white}.nav .ico{display:inline-block;width:24px;color:var(--lime)}.profile-box{margin-top:auto;border-top:1px solid #ffffff24;padding:20px 7px 0}.profile-box label{display:block;font-size:11px;color:#adbbb2;text-transform:uppercase;letter-spacing:.1em;margin-bottom:8px}.profile-box select{width:100%;background:#253a32;color:white;border:1px solid #496057;padding:10px;border-radius:9px}.profile-note{font-size:12px;color:#b1beb5;margin:10px 0 0}.aside-foot{font-size:11px;color:#92a198;padding:0 7px}.main{min-width:0;padding:0 42px 64px}.top{height:76px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between}.crumb{font-size:12px;color:var(--muted)}.live{display:inline-flex;align-items:center;gap:8px;color:var(--green);font-size:12px}.dot{width:8px;height:8px;border-radius:50%;background:#51a477;box-shadow:0 0 0 4px #51a47722}.content{max-width:1250px;margin:0 auto}.hero{padding:38px 0 24px;display:flex;justify-content:space-between;gap:20px;align-items:end}.eyebrow{text-transform:uppercase;letter-spacing:.14em;color:var(--green);font-size:11px;font-weight:700}.hero h1{font:400 clamp(32px,4vw,52px)/1.08 var(--serif);letter-spacing:-.035em;margin:9px 0 8px}.hero p{color:var(--muted);margin:0}.date{font:14px var(--serif);color:var(--muted);white-space:nowrap}.grid{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(280px,.8fr);gap:20px}.panel{background:var(--card);border:1px solid var(--line);border-radius:17px;box-shadow:var(--shadow)}.feature{overflow:hidden}.feature-head{padding:24px 25px 17px;display:flex;justify-content:space-between;gap:20px}.kicker{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}.feature h2{font:400 28px/1.18 var(--serif);margin:8px 0}.feature-desc{color:var(--muted);font-size:13px}.badge{align-self:start;background:#e7f1e7;color:var(--green);padding:6px 10px;border-radius:99px;font-size:11px;white-space:nowrap}.player{margin:0 25px 22px;background:#182b24;border-radius:14px;padding:17px;color:#f5f7f1;display:grid;grid-template-columns:48px minmax(0,1fr) 40px;gap:14px;align-items:center}.play{width:46px;height:46px;border:0;border-radius:50%;background:var(--lime);color:#173328;font-size:17px}.play:disabled{opacity:.45;cursor:not-allowed}.track-title{font-size:13px;font-weight:600}.track-sub{font-size:11px;color:#bdc9c0}.progress{height:4px;background:#ffffff34;border-radius:5px;margin:10px 0 5px;overflow:hidden}.progress i{display:block;width:0;height:100%;background:var(--lime)}.time{font-size:10px;color:#bdc9c0;display:flex;justify-content:space-between}.speed{border:1px solid #ffffff44;background:transparent;color:#f4f5ee;border-radius:7px;padding:6px;font-size:11px}.audio{display:none}.transcript-head{padding:0 25px 14px;display:flex;justify-content:space-between;align-items:center}.transcript-head h3,.section-head h2{font:400 21px var(--serif);margin:0}.transcript{padding:0 25px 23px;max-height:410px;overflow:auto}.segment{border-top:1px solid var(--line);padding:16px 0;display:grid;grid-template-columns:48px minmax(0,1fr);gap:12px}.segment.playing{background:#edf3e7}.stamp{font-size:11px;color:var(--green);font-variant-numeric:tabular-nums;padding-top:3px}.segment p{margin:0}.segment small{display:block;color:var(--muted);margin-top:8px}.claims{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}.claim{border:1px solid var(--line);background:#fafaf5;border-radius:99px;padding:4px 8px;font-size:10px;text-decoration:none}.rail{display:grid;gap:18px;align-content:start}.profile-card{padding:21px}.profile-card h3{font:400 20px var(--serif);margin:3px 0 5px}.profile-card p{font-size:12px;color:var(--muted);margin:0}.tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:14px}.tag{background:var(--soft);border-radius:99px;padding:4px 8px;font-size:10px;color:#365447}.metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:17px}.metric{background:#f4f5ef;border-radius:10px;padding:10px}.metric b{display:block;font:21px var(--serif)}.metric span{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}.section{margin-top:27px}.section-head{display:flex;justify-content:space-between;align-items:end;margin-bottom:12px;gap:14px}.section-head p{color:var(--muted);font-size:12px;margin:4px 0 0}.search{width:min(280px,45vw);border:1px solid var(--line);border-radius:9px;padding:9px 11px;background:var(--card)}.stories{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}.story{background:var(--card);border:1px solid var(--line);border-radius:13px;padding:16px;min-width:0}.story-top{display:flex;justify-content:space-between;color:var(--muted);font-size:10px}.story h3{font:400 18px/1.25 var(--serif);margin:12px 0}.story-meta{display:flex;gap:7px;flex-wrap:wrap;color:var(--muted);font-size:10px}.story button{margin-top:14px;border:0;background:none;padding:0;color:var(--green);font-size:11px;font-weight:700}.story-detail{margin-top:12px;border-top:1px solid var(--line);padding-top:10px;font-size:11px}.story-detail a{display:block;margin-top:6px;overflow-wrap:anywhere}.empty{padding:30px;text-align:center;color:var(--muted);border:1px dashed var(--line);border-radius:12px}.status{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:#172b24;color:white;padding:10px 16px;border-radius:10px;box-shadow:var(--shadow);font-size:12px;display:none}.status.show{display:block}.settings{display:none;margin-top:16px;border-top:1px solid var(--line);padding-top:14px}.settings.open{display:block}.pref-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.pref-field{display:grid;gap:5px;font-size:11px;color:var(--muted)}.pref-field input,.pref-field select,.pref-field textarea{width:100%;padding:9px 10px;border:1px solid var(--line);border-radius:9px;background:#fffefa;color:var(--ink)}.pref-field textarea{min-height:64px;resize:vertical}.pref-field.wide{grid-column:1/-1}.settings-note{font-size:11px;color:var(--muted);margin:12px 0.actions{display:flex;gap:9px;align-items:center;flex-wrap:wrap}.primary{background:var(--green);color:white;border:0;padding:10px 14px;border-radius:9px}.secondary{background:transparent;border:1px solid var(--line);padding:9px 13px;border-radius:9px}.verify{color:var(--green);font-size:10px}.verify.bad{color:var(--red)}
+@media(max-width:1000px){.shell{grid-template-columns:205px 1fr}.main{padding:0 24px 50px}.grid{grid-template-columns:1fr}.rail{grid-template-columns:1fr 1fr}.stories{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:650px){.shell{display:block}aside{padding:12px 14px;display:flex;flex-direction:row;align-items:center;justify-content:space-between;gap:10px;position:sticky;top:0;z-index:5}.brand{padding:0}.brand small,.nav,.aside-foot{display:none}.profile-box{margin:0;padding:0;border:0}.profile-box label,.profile-note{display:none}.profile-box select{max-width:150px}.main{padding:0 15px 38px}.top{height:54px}.hero{padding:26px 0 18px;align-items:start;flex-direction:column}.hero h1{font-size:37px}.date{display:none}.rail{grid-template-columns:1fr}.stories{grid-template-columns:1fr}.feature-head{padding:19px}.feature h2{font-size:24px}.player{margin:0 14px 18px;grid-template-columns:43px 1fr 36px;gap:9px;padding:13px}.play{width:42px;height:42px}.transcript-head{padding:0 18px 12px}.transcript{padding:0 18px 18px}.segment{grid-template-columns:40px 1fr}.search{width:46vw}.metrics{gap:5px}.pref-grid{grid-template-columns:1fr}.pref-field.wide{grid-column:auto}}
+</style></head>
+<body><div class="shell">
+<aside><div class="brand"><div class="mark">L</div><div><b>Liquid Briefing</b><small>News, tuned to you</small></div></div>
+<nav class="nav"><button class="active" data-scroll="home"><span class="ico">◉</span>Today</button><button data-scroll="story-section"><span class="ico">▤</span>Story desk</button><button data-scroll="listener-card"><span class="ico">◌</span>My listener</button></nav>
+<div class="profile-box"><label for="listener">Listening as</label><select id="listener" aria-label="Choose listener profile"></select><p class="profile-note" id="profile-note">Personalized for your morning.</p></div><div class="aside-foot">A personal view of the news</div></aside>
+<main class="main"><div class="top"><span class="crumb">YOUR DAILY EDITION&nbsp; / &nbsp;<span id="edition-date">TODAY</span></span><span class="live"><i class="dot" id="ready-dot"></i><span id="readiness">Checking generation setup</span></span></div><div class="content" id="home">
+<header class="hero"><div><div class="eyebrow">The Liquid Briefing · Daily audio</div><h1>The world, in your rhythm.</h1><p id="hero-copy">A clear, personal briefing built from reporting you can trace.</p></div><div class="date" id="date-label"></div></header>
+<div class="grid"><section class="panel feature"><div class="feature-head"><div><div class="kicker">Your latest briefing</div><h2 id="briefing-title">Your morning, made clearer.</h2><div class="feature-desc" id="briefing-sub">Choose a listener profile to see its briefing.</div></div><span class="badge" id="trust-badge">Evidence linked</span></div>
+<div class="player"><button class="play" id="play" aria-label="Play briefing">▶</button><div><div class="track-title" id="audio-title">The Liquid Briefing</div><div class="track-sub" id="audio-sub">Audio appears when a generated briefing is available</div><div class="progress"><i id="progress"></i></div><div class="time"><span id="elapsed">00:00</span><span id="duration">--:--</span></div></div><button class="speed" id="speed">1×</button><audio class="audio" id="audio" preload="metadata"></audio></div>
+<div class="transcript-head"><h3>Listen along</h3><span class="verify" id="verify-label">Claim sources available</span></div><div class="transcript" id="transcript"><div class="empty">Load a saved briefing to see its transcript and sources.</div></div></section>
+<div class="rail"><section class="panel profile-card" id="listener-card"><div class="kicker">Your listener</div><h3 id="profile-name">Choose a profile</h3><p id="profile-desc">Your preferences shape story choice, depth and tone.</p><div class="tags" id="profile-tags"></div><div class="metrics"><div class="metric"><b id="m-stories">—</b><span>Stories</span></div><div class="metric"><b id="m-time">—</b><span>Minutes</span></div><div class="metric"><b id="m-flags">—</b><span>Review flags</span></div></div><div class="actions" style="margin-top:15px"><button class="secondary" id="edit-profile">Edit preferences</button></div><div class="settings" id="settings"><p class="kicker">Make this briefing yours</p><div class="pref-grid"><label class="pref-field">Name<input id="pref-name" maxlength="60"></label><label class="pref-field">Language<select id="pref-language"><option value="en">English</option><option value="nl">Dutch</option><option value="de">German</option></select></label><label class="pref-field wide">About you<input id="pref-description" maxlength="240"></label><label class="pref-field wide">Topics to follow <small>Separate topics with commas</small><textarea id="pref-interests"></textarea></label><label class="pref-field wide">Topics to avoid <small>Separate topics with commas</small><textarea id="pref-avoid"></textarea></label><label class="pref-field wide">How much detail?<input id="pref-depth" maxlength="180"></label><label class="pref-field">Length<select id="pref-length"><option value="3">3 minutes</option><option value="4">4 minutes</option><option value="5">5 minutes</option><option value="6">6 minutes</option><option value="8">8 minutes</option><option value="10">10 minutes</option></select></label><label class="pref-field">Stories<select id="pref-stories"><option value="3">3 stories</option><option value="4">4 stories</option><option value="5">5 stories</option><option value="6">6 stories</option><option value="7">7 stories</option><option value="8">8 stories</option></select></label><label class="pref-field wide">Voice style<input id="pref-tone" maxlength="100"></label></div><p class="settings-note">Saved on this project so your preferences stay available after a restart.</p><div class="actions"><button class="primary" id="apply-profile">Save preferences</button><button class="secondary" id="cancel-profile">Cancel</button></div></div></section>
+<section class="panel profile-card"><div class="kicker">How this edition is made</div><h3>Reporting with a paper trail.</h3><p>Stories are grouped, matched to your interests and checked against their source facts. Open any claim to read the supporting articles.</p><div class="tags"><span class="tag">AI voice disclosed</span><span class="tag">Source-linked claims</span><span class="tag">Conflicts surfaced</span></div></section></div></div>
+<section class="section" id="story-section"><div class="section-head"><div><div class="kicker">From the news desk</div><h2>Stories worth your attention</h2><p id="story-count">Browse clustered reporting and original sources.</p></div><input class="search" id="search" placeholder="Search stories or topics…" aria-label="Search stories"></div><div class="stories" id="stories"><div class="empty">Loading the story desk…</div></div></section>
+</div></main></div><div class="status" id="status" role="status" aria-live="polite"></div>
 <script>
-const $ = s => document.querySelector(s);
-const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
-const api = async (p, opt) => { const r = await fetch(p, opt); const j = await r.json(); if (!r.ok) throw new Error(j.error || r.statusText); return j; };
-const shown = [];  // names of briefings on screen, max 2 for comparison
-
-const WILDCARD = {
-  name: "Wildcard",
-  description: "Describe the wildcard listener the jury hands out",
-  language: "en",
-  interests: [],
-  avoid: [],
-  depth: "medium",
-  length_minutes: 4,
-  max_stories: 5,
-  tone: "friendly"
-};
-
-let listeners = [];
-async function loadListeners() {
-  listeners = await api("/api/listeners");
-  $("#listeners").innerHTML = listeners.map((l, i) =>
-    `<button data-i="${i}">${esc(l.profile.name)} · ${esc(l.profile.language)}</button>`).join("") +
-    `<button data-i="w">+ Wildcard</button>`;
-  $("#listeners").onclick = e => {
-    const b = e.target.closest("button"); if (!b) return;
-    [...$("#listeners").children].forEach(x => x.classList.toggle("on", x === b));
-    const p = b.dataset.i === "w" ? WILDCARD : listeners[+b.dataset.i].profile;
-    $("#profile").value = JSON.stringify(p, null, 2);
-  };
-  $("#listeners").firstElementChild?.click();
-}
-
-async function loadSaved() {
-  const names = await api("/api/briefings");
-  $("#saved").innerHTML = names.length ? names.map(n =>
-    `<button data-n="${esc(n)}" class="${shown.includes(n) ? "on" : ""}">${esc(n)}</button>`).join("")
-    : `<span class="desc">No briefings yet.</span>`;
-}
-$("#saved").onclick = e => { const b = e.target.closest("button"); if (b) toggle(b.dataset.n); };
-
-function toggle(name, force) {
-  const i = shown.indexOf(name);
-  if (i >= 0 && !force) shown.splice(i, 1);
-  else if (i < 0) { shown.push(name); if (shown.length > 2) shown.shift(); }
-  renderCards(); loadSaved();
-}
-
-async function renderCards() {
-  if (!shown.length) { $("#cards").innerHTML = `<div class="empty">Pick saved briefings above to compare them side by side, or generate one.</div>`; return; }
-  const data = await Promise.all(shown.map(n => api("/api/briefing/" + encodeURIComponent(n))));
-  $("#cards").innerHTML = data.map(card).join("");
-  data.forEach(b => wireAudio(b));
-}
-
-function card(b) {
-  const s = b.summary, p = b.profile;
-  const flagsBySeg = {};  // verify has no disclosure segment, sources does: offset by 1
-  b.verify.forEach((v, i) => {
-    const bad = (v.claims || []).filter(c => c.verdict !== "supported").map(c => `${c.verdict}: ${c.claim}`);
-    if (v.numbers_not_in_sources?.length) bad.push("numbers not in sources: " + v.numbers_not_in_sources.join(", "));
-    if (v.advice_regex || v.investment_advice) bad.push("possible investment advice");
-    if (bad.length) flagsBySeg[i + 1] = bad;
-  });
-  const segs = b.sources.map((r, i) => `
-    <div class="seg" id="${esc(b.name)}-seg-${i}" data-start="${r.start_s ?? ""}" data-end="${r.end_s ?? ""}">
-      ${r.start_s != null ? `<span class="t" data-seek="${r.start_s}">${fmt(r.start_s)}</span>` : ""}${esc(r.text)}
-      ${(flagsBySeg[i] || []).map(f => `<div class="flag">⚑ ${esc(f)}</div>`).join("")}
-      ${(r.conflicts || []).map(c => `<div class="conflict">Sources disagree: ${esc(c.issue)}</div>`).join("")}
-      ${r.claims.length ? `<details><summary>${r.claims.length} claim${r.claims.length > 1 ? "s" : ""} · sources</summary>
-        ${r.claims.map(c => `<div class="claim">${esc(c.fact || c.fact_id)}
-          ${c.sources.map(x => `<div class="src"><a href="${esc(x.url)}" target="_blank" rel="noopener">${esc(x.outlet)}: ${esc(x.title)}</a> · ${esc((x.published || "").slice(0, 10))}</div>`).join("")}
-        </div>`).join("")}</details>` : ""}
-    </div>`).join("");
-  return `<div class="card" data-name="${esc(b.name)}">
-    <h3>${esc(p.name || b.name)} <button onclick="toggle('${esc(b.name)}')">close</button></h3>
-    <div class="desc">${esc(p.description || "")}</div>
-    <div class="chips">
-      <span class="chip">${esc(s.language)}</span>
-      <span class="chip">${s.stories} stories</span>
-      <span class="chip">${s.words} words · ~${s.minutes} min</span>
-      <span class="chip ${s.flagged ? "bad" : "ok"}">${s.flagged} flagged</span>
-      <span class="chip">$${(s.usd ?? 0).toFixed(3)}</span>
-    </div>
-    ${b.audio ? `<audio controls preload="metadata" src="${b.audio}?v=${Date.now()}"></audio>` : `<div class="desc">Text only (no audio generated).</div>`}
-    ${segs}
-  </div>`;
-}
-
-function wireAudio(b) {
-  const el = document.querySelector(`.card[data-name="${CSS.escape(b.name)}"]`);
-  const audio = el.querySelector("audio");
-  el.querySelectorAll("[data-seek]").forEach(t => t.onclick = () => { if (audio) { audio.currentTime = +t.dataset.seek; audio.play(); } });
-  if (!audio) return;
-  audio.ontimeupdate = () => el.querySelectorAll(".seg").forEach(s =>
-    s.classList.toggle("playing", s.dataset.start !== "" && audio.currentTime >= +s.dataset.start && audio.currentTime < +s.dataset.end));
-}
-
-const fmt = s => `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
-
-$("#go").onclick = async () => {
-  let profile;
-  try { profile = JSON.parse($("#profile").value); } catch (e) { return status("Profile is not valid JSON: " + e.message, true); }
-  $("#go").disabled = true;
-  status("Ranking, writing and checking the script…" + ($("#audio").checked ? " then recording audio." : ""));
-  const t0 = Date.now();
-  try {
-    const { job, name } = await api("/api/generate", { method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ profile, audio: $("#audio").checked, save: $("#save").checked }) });
-    let j;
-    do { await new Promise(r => setTimeout(r, 2000)); j = await api("/api/jobs/" + job);
-         status(`Working… ${Math.round((Date.now() - t0) / 1000)}s`); } while (j.status === "running");
-    if (j.status === "error") throw new Error(j.error);
-    status(`Done in ${Math.round((Date.now() - t0) / 1000)}s.`);
-    if ($("#save").checked) loadListeners();
-    toggle(name, true);
-  } catch (e) { status(e.message, true); }
-  $("#go").disabled = false;
-};
-const status = (m, err) => { $("#status").textContent = m; $("#status").classList.toggle("err", !!err); };
-
-document.querySelectorAll("[data-tab]").forEach(b => b.onclick = () => {
-  document.querySelectorAll("[data-tab]").forEach(x => x.classList.toggle("on", x === b));
-  $("#tab-briefings").hidden = b.dataset.tab !== "briefings";
-  $("#tab-stories").hidden = b.dataset.tab !== "stories";
-});
-
-async function loadStories() {
-  const st = await api("/api/stories");
-  $("#meta").textContent = st.length ? `${st.length} stories from ${st.reduce((a, s) => a + s.articles, 0)} articles` : "No stories yet: run python run.py first";
-  $("#stories").innerHTML = `<tr><th>#</th><th>Story</th><th>Topics</th><th>Imp.</th><th>Outlets</th><th>Arts</th><th>Facts</th></tr>` +
-    st.slice(0, 150).map((s, i) => `<tr><td class="num">${i + 1}</td><td>${esc(s.headline)}${s.conflicts ? ` <span class="conflict">· ${s.conflicts} conflict</span>` : ""}</td>
-      <td>${(s.topics || []).slice(0, 5).map(t => `<span class="chip">${esc(t)}</span>`).join(" ")}</td>
-      <td class="num">${s.importance ?? ""}</td><td class="num">${s.n_sources}</td><td class="num">${s.articles}</td><td class="num">${s.facts}</td></tr>`).join("");
-}
-
-loadListeners(); loadSaved(); loadStories();
-</script>
-</body>
-</html>
+const $=s=>document.querySelector(s),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const api=async p=>{const r=await fetch(p);const j=await r.json();if(!r.ok)throw Error(j.error||r.statusText);return j};let listeners=[],stories=[],briefings=[],active=null,audio=null;
+const wildcard={name:'My Briefing',description:'A personal mix of the subjects you follow.',language:'en',interests:['world','technology','markets'],avoid:[],depth:'clear and concise',length_minutes:4,max_stories:5,tone:'warm and direct'};
+function toast(s){const e=$('#status');e.textContent=s;e.classList.add('show');setTimeout(()=>e.classList.remove('show'),2600)}
+function localProfiles(){try{return JSON.parse(localStorage.getItem('liquid-profiles')||'{}')}catch{return {}}}
+function fillPreferences(p){$('#pref-name').value=p.name||'';$('#pref-language').value=p.language||'en';$('#pref-description').value=p.description||'';$('#pref-interests').value=(p.interests||[]).join(', ');$('#pref-avoid').value=(p.avoid||[]).join(', ');$('#pref-depth').value=p.depth||'';$('#pref-length').value=String(p.length_minutes||4);$('#pref-stories').value=String(p.max_stories||5);$('#pref-tone').value=p.tone||''}
+function readPreferences(){const list=id=>$('#'+id).value.split(',').map(x=>x.trim()).filter(Boolean);return {name:$('#pref-name').value.trim(),description:$('#pref-description').value.trim(),language:$('#pref-language').value,interests:list('pref-interests'),avoid:list('pref-avoid'),depth:$('#pref-depth').value.trim(),length_minutes:Number($('#pref-length').value),max_stories:Number($('#pref-stories').value),tone:$('#pref-tone').value.trim()}}
+function selectProfile(i){active=i==='custom'?{file:'custom',profile:localProfiles().custom||wildcard}:listeners.find(x=>x.file===i);if(!active)return;$('#audio').pause();$('#listener').value=i;const p=active.profile;$('#profile-name').textContent=p.name||'My Briefing';$('#profile-desc').textContent=p.description||'Your preferences shape story choice, depth and tone.';$('#profile-note').textContent=`${p.language||'en'} ? ${p.length_minutes||4} minute edition`;$('#profile-tags').innerHTML=(p.interests||[]).slice(0,5).map(x=>`<span class="tag">${esc(x)}</span>`).join('');fillPreferences(p);$('#hero-copy').textContent=`A ${p.length_minutes||4}-minute edition in ${p.language||'English'}, shaped around what matters to ${p.name||'you'}.`;loadBriefing();}
+async function loadBriefing(){const key=active?.file==='custom'?(active?.profile?.name||'').toLowerCase().replace(/[^a-z0-9_-]+/g,'_').replace(/^_|_$/g,''):active?.file;const name=briefings.includes(key)?key:null;if(!name){$('#briefing-title').textContent=`A briefing for ${active?.profile?.name||'you'}`;$('#briefing-sub').textContent='Generate an edition to hear this listener’s version of the news.';$('#m-stories').textContent='—';$('#m-time').textContent='—';$('#m-flags').textContent='—';$('#trust-badge').textContent='Personalized edition';$('#audio').pause();$('#audio').removeAttribute('src');$('#audio').load();$('#play').disabled=true;$('#play').textContent=String.fromCharCode(9654);$('#elapsed').textContent='00:00';$('#duration').textContent='--:--';$('#progress').style.width='0%';renderTranscript([]);return}try{const b=await api('/api/briefing/'+encodeURIComponent(name));if(JSON.stringify(b.profile)!==JSON.stringify(active.profile)){$('#briefing-title').textContent=`Ready for ${active.profile.name}`;$('#briefing-sub').textContent='Your preferences changed. Generate a fresh edition to update the audio.';$('#trust-badge').textContent='Regeneration needed';$('#audio').pause();$('#audio').removeAttribute('src');$('#audio').load();$('#play').disabled=true;renderTranscript([]);return}renderBriefing(b)}catch(e){toast(e.message)}}
+function renderBriefing(b){const s=b.summary||{},p=b.profile||{},rows=b.sources||[];active.verify=b.verify||[];const unresolved=rows.some(r=>r.warning||(r.claims||[]).some(c=>!(c.sources||[]).length));const verified=!s.flagged&&!unresolved;$('#briefing-title').textContent=s.first||`${p.name||'Your'} briefing`;$('#briefing-sub').textContent=`${s.stories||0} stories · ${s.minutes||0} min · ${s.language||'en'}`;$('#m-stories').textContent=s.stories??'—';$('#m-time').textContent=s.minutes??'—';$('#m-flags').textContent=s.flagged??'—';$('#trust-badge').textContent=verified?'Checks passed':'Review recommended';$('#trust-badge').style.background=verified?'#e7f1e7':'#f8e9e4';$('#verify-label').textContent=verified?'Claims checked and sources resolved':`${s.flagged||0} verification flag(s) or unresolved source(s)`;const a=$('#audio');if(b.audio){a.pause();a.src=b.audio;a.load();$('#play').textContent=String.fromCharCode(9654);$('#play').setAttribute('aria-label','Play briefing');$('#audio-sub').textContent='Play your personal audio edition';$('#play').disabled=false}else{$('#audio-sub').textContent='Text edition · audio has not been generated';a.pause();a.removeAttribute('src');a.load();$('#play').disabled=true;$('#play').textContent=String.fromCharCode(9654);$('#elapsed').textContent='00:00';$('#duration').textContent='--:--';$('#progress').style.width='0%'}renderTranscript(rows)}
+function renderTranscript(rows){const vmap={};(active?.verify||[]).forEach((x,i)=>vmap[i+1]=x);if(!rows.length){$('#transcript').innerHTML='<div class="empty">No saved briefing yet. Generate one from the listener profile to see the transcript here.</div>';return}$('#transcript').innerHTML=rows.map((r,i)=>{const v=vmap[i];const warning=(v?.advice_regex||v?.investment_advice||(v?.numbers_not_in_sources||[]).length||(v?.unknown_fact_ids||[]).length)?'<small class="verify bad">This segment needs a human review.</small>':'';return `<article class="segment" data-start="${r.start_s??''}" data-end="${r.end_s??''}"><span class="stamp">${r.start_s==null?'—':fmt(r.start_s)}</span><div><p>${esc(r.text)}</p>${warning}${r.warning?`<small class="verify bad">${esc(r.warning)}</small>`:''}${(r.conflicts||[]).map(c=>`<small class="verify bad">Sources disagree: ${esc(c.issue)}</small>`).join('')}${r.claims?.length?`<div class="claims">${r.claims.map(c=>`<span class="claim">${esc(c.fact||c.fact_id)} · ${c.sources?.length||0} source${c.sources?.length===1?'':'s'}</span>`).join('')}</div><details><summary class="profile-note">Open source articles</summary>${r.claims.flatMap(c=>c.sources||[]).map(x=>`<a class="story-detail" href="${esc(x.url)}" target="_blank" rel="noopener">${esc(x.outlet)} · ${esc(x.title)}</a>`).join('')}</details>`:''}</div></article>`}).join('')}
+function fmt(s){return `${String(Math.floor(s/60)).padStart(2,'0')}:${String(Math.floor(s%60)).padStart(2,'0')}`}
+function renderStories(){const q=$('#search').value.toLowerCase();const list=stories.filter(s=>`${s.headline} ${(s.topics||[]).join(' ')}`.toLowerCase().includes(q));$('#story-count').textContent=`${list.length} stories · ${stories.reduce((a,s)=>a+s.articles,0)} articles represented`;$('#stories').innerHTML=list.slice(0,60).map(s=>`<article class="story"><div class="story-top"><span>${esc((s.published||'').slice(0,10)||'DAILY EDITION')}</span><span>${s.conflicts?`⚠ ${s.conflicts} conflict${s.conflicts===1?'':'s'}`:'● grouped'}</span></div><h3>${esc(s.headline)}</h3><div class="story-meta"><span>${s.n_sources||0} outlets</span><span>·</span><span>${s.articles} articles</span><span>·</span><span>${s.facts} facts</span></div><div class="tags">${(s.topics||[]).slice(0,4).map(t=>`<span class="tag">${esc(t)}</span>`).join('')}</div><button data-story="${esc(s.story_id)}">Explore reporting ↗</button><div class="story-detail" hidden></div></article>`).join('')||'<div class="empty">No stories match that search.</div>';$('#stories').onclick=async e=>{const b=e.target.closest('[data-story]');if(!b)return;const box=b.nextElementSibling;if(!box.hidden){box.hidden=true;return}try{const d=await api('/api/story/'+encodeURIComponent(b.dataset.story));box.innerHTML=`<b>Key facts</b>${(d.facts||[]).slice(0,5).map(f=>`<p>${esc(f.text)}</p>`).join('')}<b>Original reporting</b>${(d.articles||[]).map(a=>`<a href="${esc(a.url)}" target="_blank" rel="noopener">${esc(a.outlet)} · ${esc(a.title)}</a>`).join('')}`;box.hidden=false}catch(err){toast(err.message)}}}
+async function generateEdition(){const b=$('#generate');b.disabled=true;toast('Building your edition…');try{const r=await fetch('/api/generate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({profile:active.profile,name:active.file,audio:$('#make-audio').checked,save:false})});const j=await r.json();if(!r.ok)throw Error(j.error||r.statusText);let job;do{await new Promise(resolve=>setTimeout(resolve,1200));job=await api('/api/jobs/'+j.job)}while(job.status==='running');if(job.status==='error')throw Error(job.error);if(!briefings.includes(j.name))briefings.unshift(j.name);const data=await api('/api/briefing/'+encodeURIComponent(j.name));renderBriefing(data);toast('Your edition is ready')}catch(e){toast(e.message)}finally{b.disabled=false}}
+async function boot(){try{[listeners,stories,briefings]=await Promise.all([api('/api/listeners'),api('/api/stories'),api('/api/briefings')]);const readiness=await api('/api/status');const missing=!readiness.stories_loaded?'story data':!readiness.openai_sdk?'OpenAI SDK':!readiness.openai_key?'OpenAI API key':'';$('#readiness').textContent=readiness.text_ready?'Ready to generate text':`Setup needed: ${missing}`;$('#ready-dot').style.background=readiness.text_ready?'#51a477':'#c56a45';const custom=localProfiles().custom;const all=listeners.map(x=>x.file);if(custom)all.push('custom');$('#listener').innerHTML=all.map(i=>{const p=i==='custom'?custom:listeners.find(x=>x.file===i).profile;return `<option value="${esc(i)}">${esc(p.name)} · ${esc(p.language||'en')}</option>`}).join('')+(custom?'':'<option value="custom">＋ Create my listener</option>');$('#date-label').textContent=new Intl.DateTimeFormat(undefined,{weekday:'long',month:'long',day:'numeric'}).format(new Date());$('#edition-date').textContent=new Intl.DateTimeFormat(undefined,{month:'short',day:'numeric'}).format(new Date()).toUpperCase();$('#listener-card').querySelector('.metrics').insertAdjacentHTML('afterend','<div class="actions generation"><label style="font-size:11px;color:var(--muted)"><input type="checkbox" id="make-audio"> Include audio (uses voice credits)</label><button class="primary" id="generate">Generate edition</button></div>');$('#generate').onclick=generateEdition;$('#generate').disabled=!readiness.text_ready;$('#generate').title=readiness.text_ready?'Generate a listener-specific briefing':'Install requirements and configure the OpenAI key';$('#make-audio').disabled=!readiness.audio_configured;$('#make-audio').title=readiness.audio_configured?'Include spoken audio; the key must have Text to Speech permission':'Audio requires a configured ElevenLabs API key';renderStories();selectProfile(all.find(i=>i==='world_listener'&&briefings.includes(i))||all.find(i=>briefings.includes(i)&&!i.startsWith('dutch_')&&!i.startsWith('german_'))||all.find(i=>briefings.includes(i))||all[0]||'custom')}catch(e){toast('Could not load the briefing data: '+e.message)}}
+async function savePreferences(){const p=readPreferences();if(!p.name)throw Error('Add a name for this listener first.');const response=await fetch('/api/listeners/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({file:active.file==='custom'?undefined:active.file,profile:p})});const saved=await response.json();if(!response.ok)throw Error(saved.error||response.statusText);active={file:saved.file,profile:saved.profile};const index=listeners.findIndex(x=>x.file===saved.file);if(index<0)listeners.push(saved);else listeners[index]=saved;$('#listener').innerHTML=listeners.map(x=>`<option value="${esc(x.file)}">${esc(x.profile.name)} \u00b7 ${esc(x.profile.language||'en')}</option>`).join('');selectProfile(saved.file);$('#settings').classList.remove('open');toast('Preferences saved for this project')}
+$('#listener').onchange=()=>selectProfile($('#listener').value);$('#search').oninput=renderStories;$('#edit-profile').onclick=()=>{$('#settings').classList.toggle('open');fillPreferences(active.profile)};$('#cancel-profile').onclick=()=>{$('#settings').classList.remove('open');fillPreferences(active.profile)};$('#apply-profile').onclick=()=>savePreferences().catch(e=>toast(e.message));$('#play').onclick=()=>{audio=$('#audio');if(audio.paused)audio.play().catch(()=>toast('Could not play this audio file. Check the connection and try again.'));else audio.pause()};$('#speed').onclick=()=>{audio=$('#audio');audio.playbackRate=audio.playbackRate>=2?1:audio.playbackRate+.25;$('#speed').textContent=audio.playbackRate+String.fromCharCode(215)};function playerState(playing){$('#play').textContent=playing?'\u275A\u275A':String.fromCharCode(9654);$('#play').setAttribute('aria-label',playing?'Pause briefing':'Play briefing')}const player=$('#audio');player.addEventListener('play',()=>playerState(true));player.addEventListener('pause',()=>playerState(false));player.addEventListener('ended',()=>{playerState(false);player.currentTime=0});player.addEventListener('loadedmetadata',()=>{$('#duration').textContent=fmt(player.duration)});player.addEventListener('error',()=>{if(player.src)toast('Audio could not be loaded. Try generating the edition again.')});player.ontimeupdate=()=>{const a=$('#audio');$('#progress').style.width=(a.duration?a.currentTime/a.duration*100:0)+'%';$('#elapsed').textContent=fmt(a.currentTime);$('#duration').textContent=a.duration?fmt(a.duration):'--:--';document.querySelectorAll('.segment').forEach(s=>{const start=Number(s.dataset.start),end=Number(s.dataset.end);s.classList.toggle('playing',Number.isFinite(start)&&Number.isFinite(end)&&end>start&&a.currentTime>=start&&a.currentTime<end)})};document.querySelectorAll('[data-scroll]').forEach(b=>b.onclick=()=>document.getElementById(b.dataset.scroll).scrollIntoView({behavior:'smooth'}));boot();
+</script></body></html>

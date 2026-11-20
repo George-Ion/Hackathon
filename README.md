@@ -32,36 +32,41 @@ data/raw/**/*.jsonl
 ## Setup
 
 ```powershell
-python -m venv .venv
-.venv\Scripts\Activate.ps1
-pip install -r requirements.txt
-copy .env.example .env   # OpenAI key; for ElevenLabs run: npx -y @elevenlabs/cli@latest onboard init
+python -m venv .venv313
+.venv313\Scripts\Activate.ps1
+python -m pip install -r requirements.txt
+copy .env.example .env   # add API keys; ElevenLabs key needs Text to Speech permission
 ```
 
-Unzip the Sourcera data into `data/raw/` (it's gitignored; the licence says delete it after the event).
+Place the Sourcera JSONL feed files in `data/raw/` (it's gitignored; delete licensed article data after the event).
 
 ## Run
 
 ```powershell
-python run.py --since 2026-11-18 --until 2026-11-18 --no-audio   # one day, text only (~124 articles)
-python run.py --since 2026-11-13                                 # the whole week, all listeners, with audio
+python run.py --since 2026-11-18 --until 2026-11-18              # one day, scripts and audio
+python run.py --since 2026-07-28 --until 2026-11-20              # supplied feeds, including the Zacks sample
 python run.py --reuse --listener listeners/fx_trader.json        # reuse out/stories.json, skip extraction
+python run.py --audio-only                                       # make MP3s from saved, verified scripts
 python server.py                                                 # test page on http://localhost:8000
 ```
+
+With no `--since` argument, the runner includes all dates in the supplied feed files. Use an explicit window for
+daily editions; the Zacks sample has July dates while the other feeds cover the hackathon week.
+
+Audio is synthesized through the ElevenLabs REST API using `requests`; no ElevenLabs SDK install is required. Set `API_BUDGET_USD` to override the default $5 run cap.
 
 The **test page** (`server.py` + `web/index.html`) reuses `out/stories.json`. It lets you pick or edit a
 listener (including the live wildcard), generate a briefing with or without audio, compare two briefings
 side by side, click a timestamp to jump in the audio, and expand every claim to see its source links and
 verification flags. The Stories tab shows the clustered and ranked stories.
 
-## First results (18 Nov, 124 articles, 4 listeners, text only)
-117 stories, $1.35 in total: extraction $0.73, scripts $0.52, verification $0.10, embeddings $0.001.
-That was with default reasoning effort; cheap steps now use `low`, which should cut extraction cost and time.
+## Current run (18 Nov, 124 articles, 117 stories, 4 listeners)
+All four verified text briefings and MP3s were generated. Spoken lengths (including the AI disclosure) are Dutch 526/600 words, FX 666/750, German 792/900, and World 408/450; each is within 15% above or below target. The verifier reports zero unresolved flags.
 
-## Open TODOs
-- [ ] Get the 4 official listener profiles, the answer key and the official releases from Sourcera
+Measured run cost is $4.11382: embeddings $0.001, extraction $0.73, scripts $0.52, verification $0.10, and ElevenLabs TTS $2.76282. A separate $0.25 reserve covers verification retries whose per-call usage was not persisted. Estimated full-dataset cost is $12.2374; estimated 10x-volume cost is $91.9281. See `out/cost.json` for the method and stage breakdown.
+
+## Remaining before submission
+- [ ] Listen to one MP3 per listener and confirm sound quality in Chrome
+- [ ] Get the official listener profiles, answer key, and official releases from Sourcera
 - [ ] Tune `CLUSTER_THRESHOLD` against the answer key
-- [ ] Briefings ran ~70% over target length -> a hard word limit was added; re-check
-- [ ] Re-write segments that verify flags (loop verify -> script fix)
-- [ ] Measure cost/time with low reasoning, try gpt-5-nano for extraction; write the 10x estimate
-- [ ] Pitch: who pays, how it fits a newsroom's day, how the synthetic voice is disclosed
+- [ ] Prepare the pitch: who pays, how it fits a newsroom's day, and how the synthetic voice is disclosed

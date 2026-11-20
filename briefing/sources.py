@@ -24,7 +24,9 @@ def build(segments, stories, language, timeline=None):
         if story:
             facts = {f["id"]: f for f in story.get("facts", [])}
             arts = {a["id"]: a for a in story["articles"]}
-            fact_ids = seg.get("fact_ids") or list(facts)  # fall back to all story facts if the writer skipped ids
+            fact_ids = seg.get("fact_ids") or []
+            if not fact_ids and seg.get("text", "").strip():
+                row["warning"] = "story segment has no fact ids; claims were not linked automatically"
             for fid in fact_ids:
                 f = facts.get(fid)
                 if not f:
@@ -32,11 +34,13 @@ def build(segments, stories, language, timeline=None):
                     continue
                 srcs = []
                 for aid in f.get("sources", []):
-                    if aid in arts:
+                    if aid in arts and arts[aid].get("url"):
                         url, title = _link(arts[aid], language)
                         srcs.append({"outlet": arts[aid]["outlet"], "title": title, "url": url,
                                      "published": arts[aid]["published"]})
                 row["claims"].append({"fact_id": fid, "fact": f["text"], "sources": srcs})
+                if not srcs:
+                    row["warning"] = f"fact {fid} has no resolvable source articles"
             row["conflicts"] = story.get("conflicts", [])
         rows.append(row)
     return rows

@@ -23,6 +23,7 @@ REASONING = {m: e for m, e in {
     LARGE_MODEL: os.getenv("LARGE_REASONING", "medium"),
 }.items() if e}
 TTS_PER_1K_CHARS =float(os.getenv("TTS_PER_1K_CHARS", 0.18))
+API_BUDGET_USD = float(os.getenv("API_BUDGET_USD", 5.0))
 
 # The ElevenLabs SDK reads ELEVENLABS_API_KEY from the environment itself
 ELEVENLABS_VOICE_ID = os.getenv("ELEVENLABS_VOICE_ID", "JBFqnCBsd6RMkjVDRZzb")  # George, pre-made
