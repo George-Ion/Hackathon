@@ -132,7 +132,8 @@ class Handler(SimpleHTTPRequestHandler):
         if path.startswith("/api/jobs/"):
             return self._json(JOBS.get(path.rsplit("/", 1)[1], {"status": "unknown"}))
         if path == "/api/cost":
-            return self._json(read_json(OUT / "cost.json", {}) | {"session_usd": round(COST.total(), 4)})
+            # Expose session spend separate from restored totals
+            return self._json(read_json(OUT / "cost.json", {}) | {"session_usd": round(COST.session_usd(), 4)})
         if path.startswith("/out/"):
             f = OUT / Path(path[5:]).name  # flat folder, no traversal
             if f.suffix == ".mp3" and f.exists():

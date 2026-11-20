@@ -11,7 +11,7 @@ from pathlib import Path
 
 # config loads .env before the API key is read.
 from .config import API_BUDGET_USD, ELEVENLABS_VOICE_ID, TTS_MODEL, TTS_PER_1K_CHARS
-from .cost import COST
+from .cost import COST, ensure_budget
 
 DISCLOSURES = {
     "en": "This briefing is read by an AI-generated voice and was assembled automatically from news sources.",
@@ -47,10 +47,8 @@ def synthesize_briefing(segments, out_mp3, out_timeline, language="en", voice_id
         with open(tmp_mp3, "wb") as f:
             for i, seg in enumerate(segments):
                 estimated_cost = len(seg["text"]) / 1000 * TTS_PER_1K_CHARS
-                if COST.total() + estimated_cost > API_BUDGET_USD:
-                    raise RuntimeError(
-                        f"Audio stopped before this segment to stay within the ${API_BUDGET_USD:.2f} API budget."
-                    )
+                # Use cumulative ledger for budget enforcement across processes
+                ensure_budget(estimated_cost, "tts", "elevenlabs")
                 payload = {
                     "text": seg["text"],
                     "model_id": TTS_MODEL,

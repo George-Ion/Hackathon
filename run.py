@@ -163,6 +163,8 @@ def main():
                     print(f"[{Path(lf).stem}] AUDIO ERROR: {type(e).__name__}: {e}")
                     break
 
+    # Print session spend (this process only) and the cumulative report
+    print(f"Session spend this run: ${cost.COST.session_usd():.4f}")
     print(cost.COST.report(n_articles, listener_runs, full_dataset_articles))
     cost.COST.to_json(out / "cost.json", n_articles, listener_runs, full_dataset_articles)
     if failures:

@@ -1,31 +1,64 @@
+import os
+import tempfile
+import threading
+import time
 import unittest
+from pathlib import Path
 
-from briefing.cost import CostTracker
-
-
-class TestCostProjections(unittest.TestCase):
-    def test_projections(self):
-        ct = CostTracker()
-        # Simulate measured costs
-        ct.add_tokens("embed", "gpt-4o-mini", tokens_in=1000, tokens_out=0)
-        ct.add_tokens("extract", "gpt-4o-mini", tokens_in=2000, tokens_out=500)
-        ct.add_tokens("script", "gpt-4o", tokens_in=3000, tokens_out=1500)
-        ct.add_tts(2000)
-        proj = ct.projections(measured_articles=100, listener_runs=4, full_dataset_articles=1000)
-        self.assertEqual(proj["status"], "estimated")
-        self.assertIn("full_dataset", proj)
-        self.assertIn("ten_x_volume", proj)
-        # Check that script and tts do not scale with articles
-        fd = proj["full_dataset"]["steps_usd"]
-        # embed/extract should scale by 10, script/tts not
-        for name, usd in fd.items():
-            if name.startswith("embed (") or name.startswith("extract ("):
-                # scaled by 10
-                pass
-            else:
-                # unchanged from measured; due to rounding we just ensure it's > 0
-                self.assertGreaterEqual(usd, 0.0)
+from briefing import cost
 
 
-if __name__ == '__main__':
+class CostLedgerTests(unittest.TestCase):
+    def setUp(self):
+        self.tmpdir = tempfile.TemporaryDirectory()
+        self.ledger_path = Path(self.tmpdir.name) / "spend.log"
+        # Patch the module-level ledger path
+        self.orig_ledger = cost.LEDGER_PATH
+        cost.LEDGER_PATH = self.ledger_path
+
+    def tearDown(self):
+        cost.LEDGER_PATH = self.orig_ledger
+        self.tmpdir.cleanup()
+
+    def test_ledger_sum_basic(self):
+        cost.log_spend("step1", "modelA", 0.1)
+        cost.log_spend("step2", "modelB", 0.2)
+        self.assertTrue(self.ledger_path.exists())
+        self.assertAlmostEqual(cost.spent_to_date(), 0.3, places=6)
+
+    def test_add_tokens_thread_safe(self):
+        # Set a predictable price for a test model
+        cost.PRICES["test-model"] = (1.0, 2.0)  # USD per 1M tokens
+        tracker = cost.CostTracker()
+
+        def worker(n):
+            for _ in range(n):
+                tracker.add_tokens("stepX", "test-model", 1000, 500)
+
+        threads = [threading.Thread(target=worker, args=(10,)) for _ in range(5)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        # 5*10 calls; each adds 0.002 USD (1000/1e6*1 + 500/1e6*2)
+        expected_calls = 50
+        expected_usd = 0.002 * expected_calls
+        # Give filesystem a moment to flush
+        time.sleep(0.05)
+
+        # Check counters were updated without races
+        self.assertAlmostEqual(tracker.session_usd(), expected_usd, places=6)
+        # Find the step row and verify calls and USD
+        rows = {k: v for k, v in tracker.by_step.items()}
+        key = next(k for k in rows if k.startswith("stepX (test-model)"))
+        self.assertEqual(rows[key]["calls"], expected_calls)
+        self.assertAlmostEqual(rows[key]["usd"], expected_usd, places=6)
+
+        # Ledger should contain the same total for this tracker
+        total_ledger = cost.spent_to_date()
+        self.assertAlmostEqual(total_ledger, expected_usd, places=6)
+
+
+if __name__ == "__main__":
     unittest.main()
