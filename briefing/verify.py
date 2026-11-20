@@ -8,18 +8,20 @@ from .config import CHEAP_MODEL
 from .llm import chat_json
 
 NUM = re.compile(
-    r"(?<![\w])(\d[\d,.]*)(?:\s*(thousand|million|billion|trillion|tausend|millionen?|"
-    r"milliarden?|duizend|miljoen|miljard))?",
+    # Scale words and the abbreviations sources use ("JPY 556.5B", "$1.2bn", "3,5 Mrd.", "2 mln").
+    # Longest alternatives first; the scale must not run on into another word ("5 more", "2 Monate").
+    r"(?<![\w])(\d[\d,.]*)(?:\s*(thousand|millions|million|billions|billion|trillion|tausend|millionen|"
+    r"milliarden|milliarde|duizend|miljoen|miljard|bn|mrd|mio|mln|mld|tn|b|m|k)(?![a-zà-ÿ]))?",
     re.I,
 )
 SCALES = {
-    "thousand": 1_000, "tausend": 1_000, "duizend": 1_000,
+    "thousand": 1_000, "tausend": 1_000, "duizend": 1_000, "k": 1_000,
     "million": 1_000_000, "millions": 1_000_000, "millionen": 1_000_000,
-    "miljoen": 1_000_000,
-    "billion": 1_000_000_000, "billions": 1_000_000_000,
-    "milliarde": 1_000_000_000, "milliarden": 1_000_000_000,
-    "miljard": 1_000_000_000,
-    "trillion": 1_000_000_000_000,
+    "miljoen": 1_000_000, "m": 1_000_000, "mio": 1_000_000, "mln": 1_000_000,
+    "billion": 1_000_000_000, "billions": 1_000_000_000, "bn": 1_000_000_000, "b": 1_000_000_000,
+    "milliarde": 1_000_000_000, "milliarden": 1_000_000_000, "mrd": 1_000_000_000,
+    "miljard": 1_000_000_000, "mld": 1_000_000_000,
+    "trillion": 1_000_000_000_000, "tn": 1_000_000_000_000,
 }
 ADVICE = re.compile(
     r"\b("

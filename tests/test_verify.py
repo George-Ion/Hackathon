@@ -71,6 +71,14 @@ class TestUnmatchedNumbers(unittest.TestCase):
     def test_real_mismatch_is_flagged(self):
         self.assertEqual(verify._unmatched_numbers("Gold fiel auf 3.880 Dollar", "de", self.src("Gold fell to $3,770")), {3880.0})
 
+    def test_abbreviated_scales_match_spoken_words(self):
+        self.assertEqual(verify._unmatched_numbers("narrowed to 476.5 billion yen", "en", self.src("JPY 476.5B")), set())
+        self.assertEqual(verify._unmatched_numbers("Umsatz von 3,5 Milliarden Euro", "de", self.src("revenue of EUR 3.5bn")), set())
+        self.assertEqual(verify._unmatched_numbers("2 mln aandelen", "nl", self.src("2 million shares")), set())
+
+    def test_scale_abbreviation_needs_word_end(self):
+        self.assertEqual(verify._numbers("5 more days", "en"), {5.0})
+
 
 if __name__ == '__main__':
     unittest.main()
