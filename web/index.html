@@ -628,6 +628,7 @@ function openWildcard(p={}){
     <label class="full">About the listener<input name="description" value="${v('description')}" placeholder="Who they are and when they listen"></label>
     <label class="full">Topics to follow<textarea name="interests" placeholder="e.g. ecb, inflation, gold, ai">${v('interests')}</textarea></label>
     <label class="full">Topics to avoid<input name="avoid" value="${v('avoid')}" placeholder="e.g. crypto, sports"></label>
+    <label class="full">Must hear (optional)<input name="must_hear" id="mh" value="${v('must_hear')}" placeholder="A story you want for sure, e.g. Anthropic IPO, Nvidia earnings"><span id="mhstatus" style="font-size:12.5px"></span></label>
     <label class="full">Depth<input name="depth" value="${v('depth','clear and concise: what happened and why it matters')}"></label>
     <label>Length<select name="length_minutes">${[2,3,4,5,6].map(m=>`<option ${+p.length_minutes===m||(!p.length_minutes&&m===3)?'selected':''} value="${m}">${m} minutes</option>`).join('')}</select></label>
     <label>Stories<select name="max_stories">${[3,4,5,6,7].map(m=>`<option ${+p.max_stories===m||(!p.max_stories&&m===4)?'selected':''} value="${m}">${m} stories</option>`).join('')}</select></label>
@@ -637,8 +638,11 @@ function openWildcard(p={}){
     <div class="full" style="display:flex;gap:10px"><button class="btn" id="go" type="submit">Generate briefing</button><button class="btn ghost" type="button" id="cancel">Cancel</button></div>
    </form><div class="progress" id="prog"></div>`);
   $('#cancel').onclick=closeDrawer; wirePreview($('#dbody'));
+  let mhT; const mhCheck=()=>{ clearTimeout(mhT); mhT=setTimeout(async()=>{ const ph=$('#mh').value.split(',').map(x=>x.trim()).filter(Boolean);
+    $('#mhstatus').innerHTML = ph.length ? (await post('/api/must-hear',{phrases:ph}).catch(()=>[])).map(mhLine).join('') : ''; },450); };
+  $('#mh').oninput=mhCheck; if($('#mh').value) mhCheck();
   $('#wf').onsubmit=async e=>{ e.preventDefault(); const f=new FormData(e.target); const list=k=>String(f.get(k)||'').split(',').map(x=>x.trim()).filter(Boolean);
-    const profile={name:String(f.get('name')).trim(), description:String(f.get('description')||''), language:f.get('language'), interests:list('interests'), avoid:list('avoid'),
+    const profile={name:String(f.get('name')).trim(), description:String(f.get('description')||''), language:f.get('language'), interests:list('interests'), avoid:list('avoid'), must_hear:list('must_hear'),
       depth:String(f.get('depth')||''), length_minutes:+f.get('length_minutes'), max_stories:+f.get('max_stories'), tone:String(f.get('tone')||''), voice_id:($('#wvoice')||{}).value};
     const name='wild_'+profile.name.toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_|_$/g,'').slice(0,30);
     $('#go').disabled=true; const prog=$('#prog'); prog.classList.add('open'); const t0=Date.now();
@@ -691,6 +695,7 @@ async function understand(blob, secs){
 function showRequest(j){
   const p=j.profile; const audioOk=S.status.audio_configured;
   $('#vres').innerHTML=`<div class="heard"><div class="label">What we heard</div><p>“${esc(j.transcript)}”</p></div>
+    ${(j.must_hear||[]).length?`<div class="label" style="margin-top:18px">Must hear</div><div style="margin-top:6px">${j.must_hear.map(mhLine).join('')}</div>`:''}
     <div class="label" style="margin-top:18px">What you will get</div><p style="margin:6px 0 0">${esc(j.understood||p.description)}</p>
     <div class="tags">${p.interests.map(t=>`<span class="tag hit">${esc(t)}</span>`).join('')}${p.avoid.map(t=>`<span class="tag avoid">${esc(t)}</span>`).join('')}</div>
     <div class="kv"><span>Language</span><span>${esc(LANG[p.language]||p.language)}</span><span>Length</span><span>${p.length_minutes} minutes · up to ${p.max_stories} stories</span><span>Depth</span><span>${esc(p.depth)}</span></div>
@@ -732,6 +737,14 @@ async function previewVoice(selId, btn){
   finally{ btn.disabled=false; btn.textContent=label; }
 }
 function wirePreview(root){ root.querySelectorAll('[data-preview]').forEach(b=>b.onclick=()=>previewVoice(b.dataset.preview,b)); }
+
+// ---------- must hear: one status line per named story
+function mhLine(r){
+  const ph=esc(r.phrase);
+  if(r.status==='found') return `<span style="display:block;margin-top:4px"><span class="ok">✓</span> <b>${ph}</b>: ${esc(r.headline)} <span class="dim">· goes first</span></span>`;
+  if(r.status==='not_prepared') return `<span style="display:block;margin-top:4px"><span class="warn">•</span> <b>${ph}</b>: in today's news, but not prepared for this edition</span>`;
+  return `<span style="display:block;margin-top:4px"><span class="bad">✕</span> <b>${ph}</b>: no story about this in today's news</span>`;
+}
 
 boot();
 </script>

@@ -16,7 +16,7 @@ import uuid
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-from briefing import config, ingest, make, tts, voice_request
+from briefing import config, ingest, make, must_hear, tts, voice_request
 from briefing.cost import COST
 
 ROOT = Path(__file__).resolve().parent
@@ -215,6 +215,9 @@ class Handler(SimpleHTTPRequestHandler):
         if self.path == "/api/voice-request":
             return self._voice_request(length)
         body = json.loads(self.rfile.read(length) or b"{}")
+        if self.path == "/api/must-hear":
+            pr = (read_json(OUT / "prerank.json", {}) or {}).get("stories", [])
+            return self._json(must_hear.check(load_stories(), pr, must_hear.clean(body.get("phrases"))))
         if self.path == "/api/voice":
             name = safe_name(body.get("name"))
             profile = read_json(OUT / f"{name}.profile.json")
@@ -294,7 +297,9 @@ class Handler(SimpleHTTPRequestHandler):
         except Exception as e:
             traceback.print_exc()
             return self._json({"error": f"Could not understand the request: {type(e).__name__}: {e}", "transcript": transcript}, 502)
+        pr = (read_json(OUT / "prerank.json", {}) or {}).get("stories", [])
         return self._json({"transcript": transcript, "profile": profile, "understood": understood,
+                           "must_hear": must_hear.check(load_stories(), pr, profile.get("must_hear")),
                            "usd": round(COST.session_usd() - usd_before, 4)})
 
     def log_message(self, fmt, *args):

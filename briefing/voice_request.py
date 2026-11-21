@@ -13,6 +13,7 @@ from collections import Counter
 
 from .config import CHEAP_MODEL
 from .cost import COST, ensure_budget
+from . import must_hear
 from .llm import chat_json, client
 
 TRANSCRIBE_MODEL = os.getenv("TRANSCRIBE_MODEL", "gpt-4o-mini-transcribe")
@@ -34,9 +35,11 @@ Use ONLY what they said; never invent personal facts.
 - tone: one short English phrase (default "calm and direct").
 - name: their first name if they said it, otherwise "You".
 - description: one English sentence about what they want today, from what they said.
+- must_hear: up to 3 specific stories, companies or events they explicitly want to hear about
+  ("the Anthropic IPO", "Nvidia earnings"), in English, short; empty if they only named broad topics.
 - understood: one short sentence, in the briefing language, telling them what they will get.
 Return JSON with exactly these keys: name, description, language, interests, avoid, depth,
-length_minutes, max_stories, tone, understood."""
+length_minutes, max_stories, tone, must_hear, understood."""
 
 
 def transcribe(path, seconds):
@@ -87,6 +90,7 @@ def normalize(raw, transcript=""):
         "length_minutes": length,
         "max_stories": _clamp(raw.get("max_stories"), 3, 7, min(7, max(3, round(length * 1.1)))),
         "tone": str(raw.get("tone") or "calm and direct")[:80],
+        "must_hear": must_hear.clean(raw.get("must_hear")),
         "source": "voice request",
     }
     if not profile["interests"]:
