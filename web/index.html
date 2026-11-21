@@ -206,6 +206,17 @@ button.ts:hover{color:var(--accent)}
 @keyframes s{to{transform:rotate(360deg)}}
 .toast{position:fixed;left:50%;bottom:28px;transform:translate(-50%,20px);background:#1c1c20;border:1px solid var(--line2);border-radius:999px;padding:11px 20px;font-size:14px;opacity:0;transition:all .25s;z-index:100;pointer-events:none}
 .toast.show{opacity:1;transform:translate(-50%,0)}
+/* voice request */
+.ask{display:inline-flex;align-items:center;gap:10px;margin-top:26px;border:0;border-radius:999px;padding:14px 24px;font-weight:600;font-size:16px;background:var(--text);color:#000;transition:transform .15s}
+.ask:hover{transform:scale(1.03)}.ask svg{width:18px;height:18px}
+.rec{display:flex;align-items:center;gap:20px;margin:26px 0 8px}
+.recbtn{width:84px;height:84px;border-radius:50%;border:0;background:var(--bad);color:#fff;display:grid;place-items:center;flex:none;transition:transform .15s}
+.recbtn svg{width:32px;height:32px}.recbtn:hover{transform:scale(1.05)}.recbtn:disabled{opacity:.4}
+.recbtn.on{animation:pulse 1.4s ease-in-out infinite}.recbtn.on svg{width:26px;height:26px}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(255,69,58,.5)}50%{box-shadow:0 0 0 16px rgba(255,69,58,0)}}
+.rtime{font-size:34px;font-weight:700;letter-spacing:-.03em;font-variant-numeric:tabular-nums}
+.heard{margin-top:18px;padding:16px 18px;border-radius:14px;background:var(--card2);border:1px solid var(--line)}
+.heard p{margin:6px 0 0;font-size:15.5px}
 footer{padding:48px 0 64px;border-top:1px solid var(--line);color:var(--dim);font-size:12.5px}
 .empty{padding:28px;color:var(--dim);text-align:center}
 
@@ -234,6 +245,7 @@ footer{padding:48px 0 64px;border-top:1px solid var(--line);color:var(--dim);fon
   <h1>Your morning.<br><span>Verified.</span></h1>
   <p>The news you care about, read to you in a few minutes. Tap any sentence to see the article behind it.</p>
   <div class="pills" id="pills"></div>
+  <button class="ask" id="voicebtn"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 14a3 3 0 0 0 3-3V5a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-3.08A7 7 0 0 0 19 11h-2z"/></svg>Tell us what you want to hear</button>
 </div></header>
 
 <main>
@@ -631,6 +643,68 @@ function openWildcard(p={}){
     }catch(err){ clearInterval(tick); prog.innerHTML=`<span class="bad">${esc(err.message)}</span>`; $('#go').disabled=false; }
   };
 }
+
+// ---------- voice request: record what you want to hear -> profile -> briefing
+const MIC='<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 14a3 3 0 0 0 3-3V5a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-3.08A7 7 0 0 0 19 11h-2z"/></svg>';
+const STOP='<svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>';
+let recorder=null, recTimer=null;
+function openVoice(){
+  openDrawer(`<div class="crit">Voice request</div><h3>Tell us what you want to hear today.</h3>
+    <p class="muted" style="font-size:14px">Say it the way you would tell a friend, in English, Dutch or German. For example: “Five minutes in German on gold, the ECB and energy. Nothing about crypto.”</p>
+    <div class="rec"><button class="recbtn" id="rec" aria-label="Start recording">${MIC}</button>
+      <div><div class="rtime" id="rtime">0:00</div><div class="muted" id="rhint" style="font-size:13px">Tap to start. Up to 60 seconds.</div></div></div>
+    <div id="vres"></div>`);
+  $('#rec').onclick=()=> recorder && recorder.state==='recording' ? recorder.stop() : startRecording();
+}
+async function startRecording(){
+  if(!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) return toast('This browser cannot record audio.');
+  let stream; try{ stream=await navigator.mediaDevices.getUserMedia({audio:true}); }catch{ return toast('Microphone access was blocked. Allow it in the address bar and try again.'); }
+  const type=['audio/webm;codecs=opus','audio/webm','audio/mp4','audio/ogg'].find(t=>MediaRecorder.isTypeSupported(t))||'';
+  const chunks=[], t0=Date.now(); recorder=new MediaRecorder(stream, type?{mimeType:type}:{});
+  recorder.ondataavailable=e=>{ if(e.data.size) chunks.push(e.data); };
+  recorder.onstop=()=>{ clearInterval(recTimer); stream.getTracks().forEach(t=>t.stop());
+    $('#rec').classList.remove('on'); $('#rec').innerHTML=MIC;
+    const secs=(Date.now()-t0)/1000; const blob=new Blob(chunks,{type:(recorder.mimeType||type||'audio/webm')});
+    if(secs<1.5){ $('#rhint').textContent='That was too short. Tap and say what you want to hear.'; return; }
+    understand(blob, secs); };
+  recorder.start(); $('#rec').classList.add('on'); $('#rec').innerHTML=STOP; $('#rhint').textContent='Listening… tap to finish.';
+  recTimer=setInterval(()=>{ const s=(Date.now()-t0)/1000; $('#rtime').textContent=fmt(s); if(s>=60) recorder.stop(); },200);
+}
+async function understand(blob, secs){
+  $('#rhint').innerHTML='<span class="spin"></span>Understanding your request…'; $('#rec').disabled=true; $('#vres').innerHTML='';
+  try{
+    const r=await fetch('/api/voice-request',{method:'POST',headers:{'Content-Type':blob.type.split(';')[0]||'audio/webm','X-Duration':String(Math.round(secs))},body:blob});
+    const j=await r.json();
+    if(!r.ok){ if(j.transcript) $('#vres').innerHTML=`<div class="heard"><div class="label">What we heard</div><p>“${esc(j.transcript)}”</p></div>`; throw Error(j.error||r.statusText); }
+    showRequest(j); $('#rhint').textContent='Not quite right? Record again, or adjust below.';
+  }catch(e){ $('#rhint').innerHTML=`<span class="bad">${esc(e.message)}</span>`; }
+  finally{ $('#rec').disabled=false; }
+}
+function showRequest(j){
+  const p=j.profile; const audioOk=S.status.audio_configured;
+  $('#vres').innerHTML=`<div class="heard"><div class="label">What we heard</div><p>“${esc(j.transcript)}”</p></div>
+    <div class="label" style="margin-top:18px">What you will get</div><p style="margin:6px 0 0">${esc(j.understood||p.description)}</p>
+    <div class="tags">${p.interests.map(t=>`<span class="tag hit">${esc(t)}</span>`).join('')}${p.avoid.map(t=>`<span class="tag avoid">${esc(t)}</span>`).join('')}</div>
+    <div class="kv"><span>Language</span><span>${esc(LANG[p.language]||p.language)}</span><span>Length</span><span>${p.length_minutes} minutes · up to ${p.max_stories} stories</span><span>Depth</span><span>${esc(p.depth)}</span></div>
+    <label class="check" style="display:flex;margin-top:16px"><input type="checkbox" id="vaudio" ${audioOk?'checked':'disabled'}> Include voice (uses ElevenLabs credits)</label>
+    <div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap"><button class="btn" id="vgo">Make my briefing</button><button class="btn ghost" id="vedit">Adjust first</button></div>
+    <div class="progress" id="vprog"></div>
+    <p class="dim" style="font-size:12px;margin-top:14px">Understanding the request cost ${money(j.usd)}. The recording was deleted after transcription.</p>`;
+  $('#vedit').onclick=()=>openWildcard(p);
+  $('#vgo').onclick=()=>produce(p, 'voice_'+Date.now().toString(36), $('#vaudio').checked, $('#vprog'), $('#vgo'));
+}
+async function produce(profile, name, withAudio, prog, btn){
+  btn.disabled=true; prog.classList.add('open'); const t0=Date.now();
+  const tick=setInterval(()=>{ prog.innerHTML=`<span class="spin"></span>Picking stories, writing, checking${withAudio?' and voicing':''}… ${Math.round((Date.now()-t0)/1000)} s`; },500);
+  try{ const {job}=await post('/api/generate',{profile, name, audio:withAudio, save:false});
+    let j; do{ await new Promise(r=>setTimeout(r,1500)); j=await api('/api/jobs/'+job); } while(j.status==='running');
+    clearInterval(tick); if(j.status!=='done') throw Error(j.error||'Generation failed');
+    delete S.cache[name]; S.cost=await api('/api/cost').catch(()=>S.cost); S.names=await api('/api/briefings'); S.profiles[name]=profile;
+    renderCost(); await renderCompare(); closeDrawer(); await select(name);
+    toast(profile.name==='You' ? 'Your briefing is ready' : `${profile.name}’s briefing is ready`); location.hash='#listen';
+  }catch(err){ clearInterval(tick); prog.innerHTML=`<span class="bad">${esc(err.message)}</span>`; btn.disabled=false; }
+}
+$('#voicebtn').onclick=openVoice;
 
 boot();
 </script>

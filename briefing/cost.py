@@ -66,6 +66,16 @@ class CostTracker:
                 self.by_listener[LISTENER.get()]["voice"] += usd
         log_spend("tts", "elevenlabs", usd)
 
+    def add_usd(self, step, model, usd, units=0):
+        """A paid call priced per unit (e.g. per minute of transcribed audio) rather than per token."""
+        with self._lock:
+            s = self.by_step[f"{step} ({model})"]
+            s["calls"] += 1
+            s["in"] += int(units)
+            s["usd"] += usd
+            self._add_usd_session(usd)
+        log_spend(step, model, usd)
+
     def listener_usd(self, name):
         """Exact spend so far in this process for one listener: {'text': usd, 'voice': usd}."""
         with self._lock:

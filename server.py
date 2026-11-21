@@ -9,13 +9,14 @@ import json
 import os
 import importlib.util
 import re
+import tempfile
 import threading
 import traceback
 import uuid
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-from briefing import ingest, make
+from briefing import ingest, make, voice_request
 from briefing.cost import COST
 
 ROOT = Path(__file__).resolve().parent
@@ -207,6 +208,8 @@ class Handler(SimpleHTTPRequestHandler):
 
     def do_POST(self):
         length = int(self.headers.get("Content-Length") or 0)
+        if self.path == "/api/voice-request":
+            return self._voice_request(length)
         body = json.loads(self.rfile.read(length) or b"{}")
         if self.path == "/api/voice":
             name = safe_name(body.get("name"))
@@ -244,6 +247,35 @@ class Handler(SimpleHTTPRequestHandler):
             destination.write_text(json.dumps(profile, indent=2, ensure_ascii=False), encoding="utf-8")
             return self._json({"file": name, "profile": profile})
         self.send_error(404)
+
+    def _voice_request(self, length):
+        """A recorded 'what I want to hear today' memo -> transcript + listener profile (no briefing yet).
+        The audio is written to a temp file only for transcription and deleted right after."""
+        if not 0 < length <= 8_000_000:
+            return self._json({"error": "Recording missing or too large (keep it under a minute)."}, 400)
+        data = self.rfile.read(length)
+        seconds = min(float(self.headers.get("X-Duration") or 30), 120)
+        suffix = {"audio/webm": ".webm", "audio/ogg": ".ogg", "audio/mp4": ".m4a", "audio/mpeg": ".mp3",
+                  "audio/wav": ".wav"}.get((self.headers.get("Content-Type") or "").split(";")[0], ".webm")
+        tmp = Path(tempfile.gettempdir()) / f"lb_request_{uuid.uuid4().hex}{suffix}"
+        usd_before = COST.session_usd()
+        try:
+            tmp.write_bytes(data)
+            transcript = voice_request.transcribe(tmp, seconds)
+        except Exception as e:
+            traceback.print_exc()
+            return self._json({"error": f"Could not transcribe the recording: {type(e).__name__}: {e}"}, 502)
+        finally:
+            tmp.unlink(missing_ok=True)
+        try:
+            profile, understood = voice_request.profile_from_request(transcript, load_stories())
+        except ValueError as e:
+            return self._json({"error": str(e), "transcript": transcript}, 422)
+        except Exception as e:
+            traceback.print_exc()
+            return self._json({"error": f"Could not understand the request: {type(e).__name__}: {e}", "transcript": transcript}, 502)
+        return self._json({"transcript": transcript, "profile": profile, "understood": understood,
+                           "usd": round(COST.session_usd() - usd_before, 4)})
 
     def log_message(self, fmt, *args):
         if "/api/jobs/" not in self.path:  # polling is noisy
