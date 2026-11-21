@@ -1,4 +1,4 @@
-"""Deterministic DONE.md checker. No API calls, no cost.
+"""Deterministic checker for docs/process/DONE.md. No API calls, no cost.
 
   python tools/check_done.py              # all items, audio required
   python tools/check_done.py --text-only  # skip MP3/timeline checks (items 2 audio part, 7, 9)

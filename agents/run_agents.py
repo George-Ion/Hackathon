@@ -1,4 +1,4 @@
-"""Worker + critic agents on the OpenAI API, driven by AGENT_PLAN.md and DONE.md.
+"""Worker + critic agents on the OpenAI API, driven by docs/process/AGENT_PLAN.md and DONE.md.
 
   python agents/run_agents.py --tasks P0-1,P0-2 --budget 10
   python agents/run_agents.py --tasks P0-1 --dry-run        # print the task text only
@@ -42,7 +42,7 @@ PRICES = {"gpt-5": (1.25, 0.125, 10.0), "gpt-5-mini": (0.25, 0.025, 2.0), "gpt-5
 
 NO_READ = {".env"}
 NO_WRITE_DIRS = ("data/", "liquid-briefing-data/", "listeners/", ".git/", ".venv/", "resources/", "agents/", "tools/", "out/")
-NO_WRITE_FILES = {".env", "AGENT_PLAN.md", "DONE.md", "PROJECT_DEFINITION_OF_DONE.md", ".gitignore", "requirements.txt"}
+NO_WRITE_FILES = {".env", "docs/process/AGENT_PLAN.md", "docs/process/DONE.md", ".gitignore", "requirements.txt"}
 SKIP_LIST = (".git", ".venv", "__pycache__", "node_modules", "agents/logs")
 MAX_OUT = 12000
 
@@ -368,8 +368,12 @@ def main():
     ap.add_argument("--dry-run", action="store_true")
     args = ap.parse_args()
 
-    plan = (ROOT / "AGENT_PLAN.md").read_text(encoding="utf-8")
-    done = (ROOT / "DONE.md").read_text(encoding="utf-8")
+    plan_path, done_path = ROOT / "docs" / "process" / "AGENT_PLAN.md", ROOT / "docs" / "process" / "DONE.md"
+    if not plan_path.exists():
+        raise SystemExit("No docs/process/AGENT_PLAN.md: the agent plan was removed after the build. Restore it from "
+                         "git history (git log --all -- AGENT_PLAN.md, then git show <commit>^:AGENT_PLAN.md) to run the agents again.")
+    plan = plan_path.read_text(encoding="utf-8")
+    done = done_path.read_text(encoding="utf-8")
     tasks = [t.strip() for t in args.tasks.split(",") if t.strip()]
     if args.dry_run:
         for t in tasks:

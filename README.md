@@ -1,117 +1,155 @@
-# The Liquid Briefing (Sourcera track)
+# The Liquid Briefing
 
-Team **IT WORKS LOCALLY** (Georgios, Simon). Submission deadline: **Sat 21 Nov, 10:30 (GMT+1)**.
+**A personal audio news briefing you can trust.** Liquid Briefing turns a day of news into a short spoken
+briefing for one listener. It groups the articles into stories, picks what matters to that person, writes a
+script for the ear, checks every claim against its source, and reads it aloud. Every number and claim in the
+audio links back to the article it came from.
 
-**Deliverables (from the brief):** 1) a working prototype that makes audio briefings from the dataset for at
-least two listener profiles, with every claim linked to its source article; 2) a presentation covering the problem,
-who pays, and the cost for the full dataset and at 10x the volume.
+Built at the MAIN AI Hackathon 2026 (Maastricht, Sourcera track) by team **IT WORKS LOCALLY**: Georgios and Simon.
 
-## Pipeline
+## Features
+
+**Listen**
+- A spoken briefing per listener, at the length they choose, written for the ear: greeting, overview, stories, sign-off.
+- Every edition opens with a spoken AI-voice disclosure in the listener's language.
+- A player with a transcript that follows along; click any time or drag the bar to jump.
+- Six voices to choose from (ElevenLabs), each speaking English, Dutch and German.
+
+**Trust every claim**
+- Each sentence links to its facts, and each fact links to the source article.
+- Before any audio is made, a second model checks every spoken claim against its facts, and every number is
+  compared with the sources (English, German and Dutch number formats, "1,4 biljoen" included).
+- When outlets disagree, the briefing says so and gives both sides with their sources.
+- It informs and never instructs: no advice of any kind and no alarmist wording. Official guidance is reported
+  only when it is attributed.
+- Flagged segments are rewritten from the same facts and checked again; a briefing that still fails gets no voice.
+- A trust report on the page, and a "spot-check 3 random claims" button that shows each claim next to its article.
+
+**Made for each listener**
+- Profiles set language, interests, topics to avoid, depth, length, tone and voice.
+- Different listeners get different stories, order, length and language from the same news, shown side by side.
+- "Why these stories" explains which interests each story matched.
+- **Wildcard listener:** create a new profile on the page and get a briefing in a few minutes.
+- **Voice request:** say what you want ("I'm Sophie. Three minutes on gold and the ECB, and I definitely want to
+  hear about the Anthropic IPO."). It shows what it understood before producing anything.
+- **Must hear:** name a story and it goes first, or you are told it is not in today's news.
+
+**Makes sense of the news**
+- Articles about the same event are grouped into one story; near-identical copies are merged.
+- German and Dutch translations are folded into their English original, with links in the listener's language.
+- Facts, figures and disagreements are extracted per story, and stories are ranked by importance and coverage.
+
+**Cheap at scale**
+- Free signals (coverage, recency, listener fit) decide which stories are worth a model call, so extraction does
+  not grow with article volume. A new listener's missing stories are extracted on demand.
+- A small model for extraction and checking; the large model only writes the script.
+- Every paid call is measured and logged, with an exact cost per listener and estimates for larger volumes.
+
+## How it works
 
 ```
-data/raw/**/*.jsonl
- -> ingest    rules: Newstex fields, date window, fold DE/NL Invezz translations into the EN original   (free)
- -> cluster   text-embedding-3-small + average-linkage merging (threshold 0.78), near-copies -> duplicates (~$0.001)
- -> extract   gpt-5-mini per story: facts + figures, each with source article ids; conflicts; importance
- -> rank      rules per listener: importance + number of outlets + match on topics/publisher sections   (free)
- -> script    gpt-5 per listener: written for the ear, only the extracted facts, no investment advice, word limit
- -> verify    regex number/advice check + gpt-5-mini claim check per segment
- -> tts       ElevenLabs eleven_v4, AI-voice disclosure first, a timeline showing which story plays when
- -> sources   every claim -> outlet, title, permalink (in the listener's language when a translation exists)
+news articles (JSONL)
+ -> ingest     fields, date window, translations folded into the English original           rules, free
+ -> cluster    embeddings + average linkage; borderline pairs confirmed by the small model    ~$0.01
+ -> pre-rank   coverage, recency and listener fit pick the stories worth a model call        free
+ -> extract    small model: facts and figures with source article IDs, disagreements, importance
+ -> rank       per listener: importance, coverage, interests; named stories first             free
+ -> script     large model: written for the ear, only the extracted facts, fixed length
+ -> verify     number and advice rules + small-model claim check; flagged segments repaired
+ -> voice      ElevenLabs, disclosure first, timeline of which story plays when
+ -> sources    show notes: every claim with outlet, title and link
 ```
 
-| Judging criterion (weight) | Where it lives |
-|---|---|
-| Trust and accuracy (25%) | Fact ids carry article ids (`extract.py`); script uses only those facts and flags conflicts (`script.py`); `verify.py`; `out/<name>.sources.md` |
-| Fit to the listener (20%) | `listeners/*.json` (language, interests, depth, length, tone); `rank.py`; the test page's wildcard editor |
-| Making sense of the news (20%) | `ingest.merge_translations`, `cluster.py`, `extract.py`, global ranking |
-| Scalability and cost (15%) | `cost.py` -> `out/cost.json`; the large model is used only for the script step |
-| Listening experience (10%) | Script prompt: greeting, overview, stories, sign-off; hard word limit |
-| Path to product (10%) | Spoken disclosure + show notes with sources; `docs/pitch.md` |
+Models: `gpt-5-mini` (extraction, checks), `gpt-5` (scripts), `text-embedding-3-small`,
+`gpt-4o-mini-transcribe` (voice requests), ElevenLabs `eleven_v4` (voice).
 
-## Setup
+## Run it
+
+You need Python 3.12 or newer, an OpenAI API key and an ElevenLabs API key with **Text to Speech** permission.
+
+**1. Set up**
 
 ```powershell
 python -m venv .venv
 .venv\Scripts\Activate.ps1
 python -m pip install -r requirements.txt
-copy .env.example .env   # add API keys; ElevenLabs key needs Text to Speech permission
+copy .env.example .env
 ```
 
-Use only `.venv` (Python 3.14). Running `server.py` with another Python (for example Anaconda's) starts a page
-that can't find the OpenAI package and greys out "Generate edition".
+Open `.env` and add `OPENAI_API_KEY` and `ELEVENLABS_API_KEY`. Raise `API_BUDGET_USD` if needed (it caps the
+total spend recorded in `out/spend.log`).
 
-Place the Sourcera JSONL feed files in `data/raw/` (it's gitignored; delete licensed article data after the event).
+**2. Add the news data**
 
-## Run
+Put the JSONL feed files in `data/raw/`. The folder is gitignored, because the hackathon data is licensed for the
+event only.
+
+**3. Make the briefings**
 
 ```powershell
-python run.py --since 2026-11-18 --until 2026-11-18              # one day, scripts and audio
-python run.py --since 2026-07-28 --until 2026-11-20              # supplied feeds, including the Zacks sample
-python run.py --reuse --listener listeners/fx_trader.json        # reuse out/stories.json, skip extraction
-python run.py --audio-only                                       # make MP3s from saved, verified scripts
-python server.py                                                 # test page on http://localhost:8000
+python run.py --since 2026-11-18 --until 2026-11-18
 ```
 
-With no `--since` argument, the runner includes all dates in the supplied feed files. Use an explicit window for
-daily editions; the Zacks sample has July dates while the other feeds cover the hackathon week.
+This builds one day's edition for every profile in `listeners/`, text and voice, in about 20 minutes. Results go to
+`out/`: per listener a transcript, an MP3, show notes with sources, and the verification report, plus `cost.json`.
 
-Audio is synthesized through the ElevenLabs REST API using `requests`; no ElevenLabs SDK install is required.
-Every paid call (OpenAI and ElevenLabs) is appended to `out/spend.log`; `API_BUDGET_USD` in `.env` (default $5)
-caps the ledger total. Text-only runs delete a listener's old MP3 on purpose, so stale audio never plays with a
-new script: make audio last, with `--audio-only`.
-
-## Checks and agents
+**4. Open the app**
 
 ```powershell
-python -m unittest discover -s tests                # unit tests, no API calls
-python tools/check_done.py                          # DONE.md checklist, no API calls (--text-only before audio)
-python agents/run_agents.py --tasks P1-1 --budget 3 # GPT-5 worker + critic for a task in AGENT_PLAN.md
+python server.py
 ```
 
-The agent runner commits each task the critic passes on the current branch (never pushes), and logs every call and
-its cost to `agents/logs/`.
+Then go to <http://localhost:8000>. Always start it with the project's environment (`.venv`).
 
-The **test page** (`server.py` + `web/index.html`) reuses `out/stories.json`. It lets you pick or edit a
-listener (including the live wildcard), generate a briefing with or without audio, compare two briefings
-side by side, click a timestamp to jump in the audio, and expand every claim to see its source links and
-verification flags. The Stories tab shows the clustered and ranked stories.
+**Other runs**
 
-## Final run (21 Nov, data of 18 Nov: 124 articles, 4 listeners + 1 live wildcard)
-Fresh run from an empty `out/`. `python tools/check_done.py` passes every item (2-8, 10).
+```powershell
+python run.py --since 2026-11-18 --until 2026-11-18 --no-audio   # text only, cheaper
+python run.py --reuse --no-audio                                 # rewrite scripts, reuse extracted stories
+python run.py --audio-only                                       # voice the saved, verified scripts
+python run.py --reuse --listener listeners/fx_trader.json        # one listener
+```
 
-**Making sense of the news.** Embedding grouping plus a small-model check of borderline pairs
-(digests and roundups never merge that way) turns 124 articles into **99 stories**. Before, there were 117,
-and 6 stories now combine several outlets instead of 1. Examples: the Anthropic IPO (7 articles), Nvidia
-earnings with the market reaction (10), and the oil report in English, Dutch and German.
+Text-only runs delete a listener's old MP3, so stale audio never plays with a new script. Make audio last.
 
-**Pre-ranking.** Free signals (coverage, recency, listener fit by embeddings and interest terms) shortlist
-**36 of 99 stories**. Only those are extracted, so 64% of stories never reach a model.
+## Cost (measured run, 18 Nov: 124 articles, 4 listeners + 1 wildcard)
 
-| Listener | Language | Stories | Words | Script | Voice | Flags |
-|---|---|---|---|---|---|---|
-| fx_trader | en | 6 | 695 | $0.25 | $0.78 | 0 |
-| world_listener | en | 4 | 409 | $0.23 | $0.48 | 0 |
-| german_investor | de | 4 | 843 | $0.11 | $1.03 | 0 |
-| dutch_investor | nl | 4 | 529 | $0.14 | $0.67 | 0 |
-| live wildcard | en | 3 | 405 | $0.16 | $0.47 | 0 |
+| | |
+|---|---|
+| Articles → stories | 124 → 99 stories; 36 shortlisted for extraction |
+| Whole edition, measured | **$4.42** (voice $3.43, scripts $0.85, extraction $0.09, checks $0.05) |
+| Per listener per day | $0.11–0.25 script + $0.47–1.03 voice (exact, per listener) |
+| Full dataset (1,502 articles), estimated | **$4.51** |
+| 10x volume (15,020 articles), estimated | **$4.60** |
 
-Per-listener costs are exact: every API call is tagged with the listener it belongs to.
+Article-dependent costs stay small because only shortlisted stories are extracted; most of the cost is the voice,
+which grows with listeners, not articles. Prices come from `.env` (token prices, and `TTS_PER_1K_CHARS` for voice):
+check them against your own plans.
 
-**Cost for the whole edition: $4.42 measured.**
-- Shared steps: embeddings $0.001, grouping check $0.008, extraction of 36 stories $0.09.
-- Per listener: scripts $0.85 and verification $0.04, for all listeners together.
-- Voice: $3.43.
+## Checks
 
-**Estimates:** full dataset (1,502 articles) **$4.51**; 10x volume (15,020 articles) **$4.60**. The
-article-dependent part grows from $0.10 to under $0.30, because extraction is capped by the listener count;
-nearly all of the cost is the voice, which depends on listeners, not articles.
+```powershell
+python -m unittest discover -s tests     # unit tests, no API calls
+python tools/check_done.py               # checks the outputs against docs/process/DONE.md, no API calls
+```
 
-Voice is priced at `TTS_PER_1K_CHARS` ($0.18 per 1,000 characters, set in `.env`), and OpenAI token prices
-come from `.env` too. Check both against your actual plans before quoting them.
+## Project layout
 
-## Remaining before submission
-- [ ] Listen to one MP3 per listener and confirm sound quality in Chrome
-- [ ] Get the official listener profiles, answer key, and official releases from Sourcera
-- [ ] Tune `CLUSTER_THRESHOLD` against the answer key
-- [x] Pitch notes: `docs/pitch.md` (problem, cost, who pays, newsroom day, voice disclosure); slides still to make
+```
+briefing/     the pipeline: ingest, cluster, prerank, extract, rank, script, verify, tts, sources, cost
+              plus voice_request (spoken requests), must_hear (named stories), ondemand (wildcard stories)
+listeners/    the four listener profiles
+web/          the app (one page)
+server.py     local server for the app and its API
+run.py        command line pipeline
+tools/        output checker and MP3 repair tool
+agents/       the GPT-5 worker and critic agents used during the build
+docs/         pitch notes and process documents
+tests/        unit tests
+```
+
+## Data and disclosure
+
+Article text is never shown in the app or committed to git; the app shows only titles and links. The news data is
+licensed by Newstex for the hackathon only and should be deleted after the event. All audio is AI-generated and
+says so at the start of every briefing.
