@@ -33,7 +33,14 @@ def make_briefing(profile, name, stories, out, audio=True):
     base = COST.listener_usd(name)
     lang = profile.get("language", "en")
     picked = rank.rank_for_listener(stories, profile)
-    sc = script.write_script(profile, picked)
+    try:
+        sc = script.write_script(profile, picked)
+    except ValueError as e:
+        # A script can miss the length range even after its revisions (seen with German). One fresh
+        # attempt usually lands in range; a second miss still fails with the same clear message.
+        if "allowed range" not in str(e):
+            raise
+        sc = script.write_script(profile, picked)
     report = verify.verify(sc, picked, lang)
     bad = verify.problems(report)
 
