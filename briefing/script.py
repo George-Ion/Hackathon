@@ -17,6 +17,11 @@ Hard rules:
 - When a story has conflicts, say plainly that sources disagree and give both versions with their outlets.
 - Attribute key claims to their outlet ("according to Invezz...").
 - No investment advice: never tell the listener to buy, sell or hold anything, and never predict prices.
+- Inform, never instruct: no advice of any kind (money, health, legal, safety, travel, politics). Never tell
+  the listener what they should or should not do. Official guidance is news, not advice: report it only when
+  it is in the facts, always attributed ("the health service advises..."), never in your own voice.
+- No alarm: calm, neutral wording. No dramatic words the sources do not use, no worst-case guesses, nothing
+  meant to worry the listener. Report deaths, violence and disasters factually, without graphic detail.
 - Write in the listener's language, at their depth and tone.
 - LENGTH IS A HARD LIMIT: the whole briefing must be at most target_words words. Drop facts or whole stories
   rather than run over; the listener has a fixed amount of time. Lead each story with what matters most.
@@ -166,7 +171,7 @@ REPAIR_SYSTEM = """You repair one spoken news segment. Keep the same strict rule
 - It is acceptable to drop a claim if it is not supported, but you must not add new facts.
 - For story segments, keep story_id the same and choose a non-empty subset of the allowed fact ids. Do not add ids.
 - For transition segments (story_id null), do not include any news claims or numbers and return an empty fact_ids array.
-- No investment advice in any language.
+- No investment advice in any language. Inform, never instruct; no alarmist wording.
 Return JSON: {"story_id": str|null, "fact_ids": [str], "text": str}"""
 
 
