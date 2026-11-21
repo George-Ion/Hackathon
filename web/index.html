@@ -507,7 +507,7 @@ function renderTrust(d){
     li(linked===facts.length, 'Facts linked to a source article', 'Every fact carries the IDs of the articles it came from', `${linked}/${facts.length}`)+
     li(off===0, 'Figures match the sources', 'Every number in the script is compared with the facts, in English, German and Dutch formats', off?`${off} off`:`${figs} checked`)+
     li(true, 'Disagreements between sources flagged', 'When outlets report different numbers or causes, the briefing says so', `${conflicts}`)+
-    li(calm, 'No advice, no alarm', 'Informs, never tells you what to do; calm wording. Official guidance only when attributed', calm?'none':[advice&&'advice',told&&`${told} instruction${told>1?'s':''}`,alarm&&`${alarm} alarm word${alarm>1?'s':''}`].filter(Boolean).join(', '))+
+    li(calm, 'Informs, never instructs', 'No advice and no alarmist wording. Official guidance only when attributed', calm?'0 found':[advice&&'advice',told&&`${told} instruction${told>1?'s':''}`,alarm&&`${alarm} alarm word${alarm>1?'s':''}`].filter(Boolean).join(', '))+
     li(disclosed, 'AI voice disclosed first', 'Spoken before any news, in the listener’s language', disclosed?'yes':'no')+
     (repaired?li(true,'Segments repaired automatically','Flagged segments were rewritten from the same facts and re-checked',`${repaired}`):'');
   $('#spot').classList.remove('open'); $('#spot').innerHTML='';
