@@ -646,9 +646,9 @@ function openWildcard(p={}){
       depth:String(f.get('depth')||''), length_minutes:+f.get('length_minutes'), max_stories:+f.get('max_stories'), tone:String(f.get('tone')||''), voice_id:($('#wvoice')||{}).value};
     const name='wild_'+profile.name.toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_|_$/g,'').slice(0,30);
     $('#go').disabled=true; const prog=$('#prog'); prog.classList.add('open'); const t0=Date.now();
-    const tick=setInterval(()=>{ prog.innerHTML=`<span class="spin"></span>Ranking, writing, verifying${f.get('audio')?' and voicing':''}… ${Math.round((Date.now()-t0)/1000)} s`; },500);
+    let stage=''; const tick=setInterval(()=>{ prog.innerHTML=`<span class="spin"></span>${stage?esc(stage[0].toUpperCase()+stage.slice(1)):'Ranking, writing, verifying'}${f.get('audio')?' and voicing':''}… ${Math.round((Date.now()-t0)/1000)} s`; },500);
     try{ const {job}=await post('/api/generate',{profile, name, audio:!!f.get('audio'), save:false});
-      let j; do{ await new Promise(r=>setTimeout(r,1500)); j=await api('/api/jobs/'+job); } while(j.status==='running');
+      let j; do{ await new Promise(r=>setTimeout(r,1500)); j=await api('/api/jobs/'+job); stage=j.stage||''; } while(j.status==='running');
       clearInterval(tick); if(j.status!=='done') throw Error(j.error||'Generation failed');
       delete S.cache[name]; S.cost=await api('/api/cost').catch(()=>S.cost); S.names=await api('/api/briefings'); S.profiles[name]=profile;
       renderCost(); await renderCompare(); closeDrawer(); await select(name); toast(`${profile.name}'s briefing is ready`); location.hash='#listen';

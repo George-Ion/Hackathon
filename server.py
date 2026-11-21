@@ -16,7 +16,7 @@ import uuid
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-from briefing import config, ingest, make, must_hear, tts, voice_request
+from briefing import config, ingest, make, must_hear, ondemand, tts, voice_request
 from briefing.cost import COST
 
 ROOT = Path(__file__).resolve().parent
@@ -63,7 +63,11 @@ def run_job(job_id, profile, name, audio, voice_only=False):
                 # ElevenLabs only: voice the saved, verified script; no OpenAI calls
                 JOBS[job_id]["summary"] = make.synthesize_saved_briefing(profile, name, load_stories(), OUT)
             else:
-                JOBS[job_id]["summary"] = make.make_briefing(profile, name, load_stories(), OUT, audio=audio)
+                # A new or edited listener may need stories the batch run never extracted
+                stories = ondemand.ensure_stories(profile, load_stories(), OUT,
+                                                  progress=lambda m: JOBS[job_id].update(stage=m))
+                JOBS[job_id]["stage"] = "writing the script"
+                JOBS[job_id]["summary"] = make.make_briefing(profile, name, stories, OUT, audio=audio)
             JOBS[job_id]["status"] = "done"
         except Exception as e:
             traceback.print_exc()

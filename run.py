@@ -9,7 +9,7 @@ import json
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
-from briefing import cluster, cost, extract, ingest, make, prerank, rank
+from briefing import cluster, cost, extract, ingest, make, ondemand, prerank, rank
 
 
 def extract_stories_with_retry(stories, out_dir: Path):
@@ -55,6 +55,8 @@ def build_stories(args, out):
 
     stories = cluster.cluster(articles)
     print(f"{len(stories)} stories after clustering")
+    # Every group (ids + embedding, no text), so a new listener's stories can be extracted on demand
+    ondemand.save_groups(out / "groups.json", stories, args.data, args.since, args.until)
 
     # Pre-rank with free signals; extract only stories that can reach a briefing
     profiles = {p.stem: json.loads(p.read_text(encoding="utf-8")) for p in sorted(Path("listeners").glob("*.json"))}
