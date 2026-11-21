@@ -76,8 +76,7 @@ python -m pip install -r requirements.txt
 copy .env.example .env
 ```
 
-Open `.env` and add `OPENAI_API_KEY` and `ELEVENLABS_API_KEY`. Raise `API_BUDGET_USD` if needed (it caps the
-total spend recorded in `out/spend.log`).
+Open `.env` and fill in the two keys. Everything else has working defaults (see **Settings** below).
 
 **2. Add the news data**
 
@@ -111,6 +110,20 @@ python run.py --reuse --listener listeners/fx_trader.json        # one listener
 ```
 
 Text-only runs delete a listener's old MP3, so stale audio never plays with a new script. Make audio last.
+
+## Settings (`.env`)
+
+`.env.example` lists every setting with a comment; copy it to `.env`. Never commit `.env`: it is gitignored.
+
+| Setting | Needed? | What it does |
+|---|---|---|
+| `OPENAI_API_KEY` | **required** | Extraction, scripts, checks, embeddings and voice-request transcription |
+| `ELEVENLABS_API_KEY` | **required for audio** | The voice; the key needs the **Text to Speech** permission |
+| `API_BUDGET_USD` | recommended | Stops paid calls once the total in `out/spend.log` would pass it (default $5; a full edition is about $4.50) |
+| `CHEAP_IN`, `CHEAP_OUT`, `LARGE_IN`, `LARGE_OUT`, `EMBED_IN`, `TTS_PER_1K_CHARS`, `TRANSCRIBE_PER_MIN` | optional | Prices for the cost report; set them to your own plans' rates |
+| `CHEAP_MODEL`, `LARGE_MODEL`, `EMBED_MODEL`, `TRANSCRIBE_MODEL`, `CHEAP_REASONING`, `LARGE_REASONING`, `OPENAI_TIMEOUT` | optional | Which OpenAI models are used, how hard they reason, and the call timeout |
+| `ELEVENLABS_VOICE_ID`, `TTS_MODEL` | optional | Default voice and voice model |
+| `CLUSTER_THRESHOLD`, `CLUSTER_CONFIRM`, `CLUSTER_CONFIRM_LOW`, `PORT`, `AGENT_*` | optional | Grouping tuning, the app's port, the build-time agents' models |
 
 ## Cost (measured run, 18 Nov: 124 articles, 4 listeners + 1 wildcard)
 
