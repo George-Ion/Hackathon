@@ -228,7 +228,6 @@ footer{padding:48px 0 64px;border-top:1px solid var(--line);color:var(--dim);fon
   <div class="links">
     <a href="#listen">Listen</a><a href="#trust">Trust</a><a href="#fit">Fit</a><a href="#news">Stories</a><a href="#cost">Cost</a><a href="#product">Product</a>
   </div>
-  <div class="status"><i class="dot" id="dot"></i><span id="status">Connecting…</span></div>
 </div></nav>
 
 <header class="hero"><div class="wrap">
@@ -252,7 +251,7 @@ footer{padding:48px 0 64px;border-top:1px solid var(--line);color:var(--dim);fon
       <div class="ptime"><span id="cur">0:00</span><span id="dur">--:--</span></div>
       <div class="pctl">
         <button class="chip" id="speed">1× speed</button>
-        <span class="chip blue">AI-generated voice · disclosed at the start</span>
+        <span class="chip blue">AI-generated voice</span>
         <a class="chip" id="notes" target="_blank" rel="noopener">Show notes</a>
         <button class="btn" id="makevoice" style="display:none;padding:7px 16px;font-size:13px">Make voice</button>
       </div>
@@ -367,15 +366,13 @@ async function boot(){
     S.listeners=ls; S.names=names; S.stories=stories; S.status=status; S.cost=cost;
     stories.forEach((s,i)=>{ s.rank=i+1; S.byId[s.story_id]=s; });
     ls.forEach(l=>S.profiles[l.file]=l.profile);
-    const ready = status.text_ready; $('#dot').className='dot '+(ready?'on':'off');
-    $('#status').textContent = ready ? (status.audio_configured ? 'Pipeline ready · text and voice' : 'Pipeline ready · text only') : 'Setup incomplete';
     // wildcard briefings generated on the page but not saved as listener files
     for (const n of names) if (!S.profiles[n]) { try { S.profiles[n] = (await briefing(n)).profile || {name:n}; } catch {} }
     renderPills(); renderStats(); renderStories(); renderCost(); await renderCompare();
     const first = S.listeners.find(l=>names.includes(l.file))?.file || names[0];
     if (first) await select(first);
     if (location.hash) document.querySelector(location.hash)?.scrollIntoView();
-  }catch(e){ $('#status').textContent='Server not reachable'; $('#dot').className='dot off'; toast(e.message); }
+  }catch(e){ toast('Server not reachable: '+e.message); }
 }
 
 function renderPills(){
