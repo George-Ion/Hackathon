@@ -176,7 +176,7 @@ web/            the app: one page, index.html
 listeners/      the four listener profiles (JSON)
 tests/          unit tests, fully offline
 tools/          output checker and MP3 repair tool
-agents/         the GPT-5 worker and critic agents used during the build
+agents/         the GPT-5 worker and critic agents used during the build (plan: docs/process/AGENT_PLAN.md)
 docs/           pitch notes, screenshots, process documents
 ```
 
