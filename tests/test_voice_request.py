@@ -31,3 +31,14 @@ class TestNormalize(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestNamedTopics(unittest.TestCase):
+    def test_named_topic_is_kept_but_avoided_one_is_not(self):
+        p = {"interests": ["gold", "eurozone"], "avoid": ["crypto"]}
+        out = vr.keep_named_topics(p, "Give me gold, the ECB and inflation. Nothing about crypto.",
+                                   ["ecb", "crypto", "inflation", "oil"])
+        self.assertIn("ecb", out["interests"])
+        self.assertIn("inflation", out["interests"])
+        self.assertNotIn("crypto", out["interests"])
+        self.assertNotIn("oil", out["interests"])

@@ -7,6 +7,7 @@ verify, voice) is unchanged. The model is given the topic tags that exist in tod
 the interests it writes actually match stories. The audio itself is never stored.
 """
 import json
+import re
 import os
 from collections import Counter
 
@@ -96,6 +97,20 @@ def normalize(raw, transcript=""):
 def profile_from_request(transcript, stories):
     if len(transcript.split()) < 2:
         raise ValueError("The recording was empty or too short. Try again and say what you want to hear today.")
+    topics = available_topics(stories)
     raw = chat_json("voice_profile", CHEAP_MODEL, SYSTEM, json.dumps(
-        {"request": transcript, "available_topics": available_topics(stories)}, ensure_ascii=False))
-    return normalize(raw, transcript)
+        {"request": transcript, "available_topics": topics}, ensure_ascii=False))
+    profile, understood = normalize(raw, transcript)
+    return keep_named_topics(profile, transcript, topics), understood
+
+
+def keep_named_topics(profile, transcript, topics):
+    """The model sometimes swaps a named topic for a nearby tag ("ECB" -> "eurozone"). Any of today's
+    topic tags the listener literally said is kept, unless it is on their avoid list."""
+    said = transcript.lower()
+    avoid = set(profile["avoid"])
+    for t in topics:
+        if len(t) >= 3 and t not in avoid and t not in profile["interests"] and re.search(rf"\b{re.escape(t)}\b", said):
+            profile["interests"].append(t)
+    profile["interests"] = profile["interests"][:12]
+    return profile
