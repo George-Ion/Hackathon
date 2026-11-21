@@ -166,6 +166,50 @@ python -m unittest discover -s tests     # unit tests, no API calls
 python tools/check_done.py               # checks the outputs against docs/process/DONE.md, no API calls
 ```
 
+## How it was built: worker and critic agents
+
+Much of the hardening was done by two GPT-5 agents that check each other, driven by a written plan and a
+pass/fail definition of done. A human reviewed every result and fixed what the agents got wrong.
+
+**The setup**
+- **The plan** ([docs/process/AGENT_PLAN.md](docs/process/AGENT_PLAN.md)) lists the tasks in priority order, each
+  with the files to change and an acceptance check.
+- **The definition of done** ([docs/process/DONE.md](docs/process/DONE.md)) is a shared pass/fail checklist:
+  traceability, verification, personalisation, length, disclosure, costs, git safety.
+- **A free checker** (`tools/check_done.py`) tests most of that checklist automatically, without API calls.
+- **The runner** (`agents/run_agents.py`) runs one task at a time:
+  1. The **worker** reads the code, makes the change and reports what it ran, with the real output.
+  2. The **critic** writes no code. It runs the tests and the checker itself, reads the diff, and returns
+     PASS, FAIL (with the exact fix needed) or ESCALATE.
+  3. PASS: a local git commit, one per task. FAIL: the worker gets the critic's fix, for at most 3 rounds.
+     BLOCKED, ESCALATE or the budget limit: it stops and hands over to a human.
+
+**Guardrails**
+- The agents can only touch files inside the repo. They can never read `.env`, and never write to the data,
+  the listener profiles, the plan, the checker or the runner itself.
+- Commands are an allowlist, with no shell: unit tests, the checker, read-only git, and only cheap pipeline
+  runs (`run.py --reuse --no-audio`), capped per task. Fresh runs and audio need a human.
+- Every model call is costed and logged to `agents/logs/`, with a hard budget per run. Nothing is ever pushed.
+
+**What they did**
+- 11 tasks completed: the offline unit tests, language-aware number checks, advice rules in three languages,
+  source-ID validation, both-sided length limits, honest spend tracking, the repair loop for flagged segments,
+  API retries, per-story error handling, safer data loading, and audio seeking.
+- 465 model calls, $4.82 in total.
+- The critic caught real bugs, for example a crash in the repair loop, which the worker then fixed. The
+  human review caught what both missed, such as a 90-second timeout that broke every script call, and German
+  figures in English format being flagged as wrong.
+
+**Run them**
+
+```powershell
+python agents/run_agents.py --tasks P1-1 --dry-run              # print a task from the plan
+python agents/run_agents.py --tasks P0-1,P0-2 --budget 5        # worker + critic, up to $5 of agent tokens
+```
+
+Options: `--max-paid-runs` (cheap pipeline runs per task, default 2) and `--allow-paid full` (allows fresh
+runs and audio). The models are set by `AGENT_WORKER_MODEL` and `AGENT_CRITIC_MODEL` in `.env`.
+
 ## Project layout
 
 ```
