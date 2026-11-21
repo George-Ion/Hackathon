@@ -662,7 +662,7 @@ const STOP='<svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width
 let recorder=null, recTimer=null;
 function openVoice(){
   openDrawer(`<div class="crit">Voice request</div><h3>Tell us what you want to hear today.</h3>
-    <p class="muted" style="font-size:14px">Say it the way you would tell a friend, in English, Dutch or German. For example: “Five minutes in German on gold, the ECB and energy. Nothing about crypto.”</p>
+    <p class="muted" style="font-size:14px;margin-bottom:10px">Just say:</p><div class="tags" style="margin:0 0 12px"><span class="tag hit">1 · Your name</span><span class="tag hit">2 · How long</span><span class="tag hit">3 · Your topics</span><span class="tag hit">4 · A story you must hear</span></div><p class="muted" style="font-size:14px;margin:0">For example: <span style="color:var(--text)">“I'm Sophie. Three minutes on gold and the ECB, and I definitely want to hear about the Anthropic IPO.”</span> English, Dutch or German all work.</p>
     <div class="rec"><button class="recbtn" id="rec" aria-label="Start recording">${MIC}</button>
       <div><div class="rtime" id="rtime">0:00</div><div class="muted" id="rhint" style="font-size:13px">Tap to start. Up to 60 seconds.</div></div></div>
     <div id="vres"></div>`);
