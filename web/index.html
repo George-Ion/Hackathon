@@ -100,7 +100,7 @@ button.ts:hover{color:var(--accent)}
 .disagree b{color:var(--warn)}
 
 /* trust */
-.rail{display:flex;flex-direction:column;gap:22px;position:sticky;top:76px}
+.rail{display:flex;flex-direction:column;gap:22px}
 .trust{padding:24px}
 .verdict{display:flex;align-items:center;gap:14px;margin:6px 0 18px}
 .vicon{width:44px;height:44px;border-radius:50%;display:grid;place-items:center;background:rgba(48,209,88,.14);color:var(--ok);font-size:22px;font-weight:700}
@@ -285,6 +285,7 @@ footer{padding:48px 0 64px;border-top:1px solid var(--line);color:var(--dim);fon
         <button class="btn wide" id="spotbtn" style="margin-top:16px">Spot-check 3 random claims</button>
         <div class="spot" id="spot"></div>
       </div>
+      <div class="card who" id="who"></div>
     </div>
   </div>
 </div></section>
@@ -292,11 +293,8 @@ footer{padding:48px 0 64px;border-top:1px solid var(--line);color:var(--dim);fon
 <!-- FIT -->
 <section class="block" id="fit"><div class="wrap">
   <div class="shead"><div><div class="crit">Fit to the listener</div><h2>Same news. Different briefing.</h2></div>
-    <p>Each listener gets different stories, order, depth, length and language, chosen by cheap rules from their profile. Try your own with a wildcard listener.</p></div>
-  <div class="grid2" style="margin-top:0">
-    <div class="cmp" id="cmp"></div>
-    <div class="card who" id="who"></div>
-  </div>
+    <p>Pick any two listeners. Same day of news, different stories, order, length and language.</p></div>
+  <div class="cmp" id="cmp"></div>
   <div class="overlap" id="overlap"></div>
 </div></section>
 
@@ -529,11 +527,11 @@ function renderWho(d){
   const likes=(p.interests||[]).map(x=>x.toLowerCase()); const avoid=(p.avoid||[]).map(x=>x.toLowerCase());
   const allTags=new Set(ids.flatMap(id=>(S.byId[id]?.topics||[]).map(t=>t.toLowerCase())));
   const matched=new Set(hits(allTags, likes));
-  $('#who').innerHTML=`<div class="label">Why these stories</div><h3>${esc(p.name)}</h3><p class="muted" style="margin:0;font-size:14px">${esc(p.description||'')}</p>
+  $('#who').innerHTML=`<div class="crit">Fit to the listener</div><h3>Why ${esc(p.name)} hears these stories</h3><p class="muted" style="margin:0;font-size:14px">${esc(p.description||'')}</p>
     <div class="tags">${likes.map(t=>`<span class="tag ${matched.has(t)?'hit':''}">${esc(t)}</span>`).join('')}${avoid.map(t=>`<span class="tag avoid">${esc(t)}</span>`).join('')}</div>
     <div class="kv"><span>Language</span><span>${esc(LANG[p.language]||p.language)}</span><span>Depth</span><span>${esc(p.depth||'—')}</span><span>Tone</span><span>${esc(p.tone||'—')}</span><span>Length</span><span>${esc(p.length_minutes)} min target · ${esc(d.summary?.minutes)} min spoken</span></div>
     <ol class="picked">${ids.map(id=>{ const s=S.byId[id]||{}; const m=hits(new Set((s.topics||[]).map(t=>t.toLowerCase())), likes);
-      return `<li><span>${esc(s.headline||id)}<small>Matches ${m.length?esc(m.join(', ')):'high global importance'} · importance ${esc(s.importance)}/10 · day rank #${esc(s.rank)}</small></span></li>`; }).join('')}</ol>
+      return `<li><span>${esc(s.headline||id)}<small>${m.length?'Matches '+esc(m.join(', ')):'One of the day\u2019s biggest stories'}${s.importance>=8?' · major story today':''}</small></span></li>`; }).join('')}</ol>
     <button class="btn ghost wide" style="margin-top:16px" id="tweak">Try a variation as a wildcard</button>`;
   $('#tweak').onclick=()=>openWildcard({...p, name:(p.name||'Listener')+' variant'});
 }
