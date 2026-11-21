@@ -1,6 +1,7 @@
 import json
 import unittest
 from types import SimpleNamespace
+from unittest import mock
 
 from briefing import script, verify
 
@@ -89,7 +90,11 @@ class RepairLoopTest(unittest.TestCase):
 
         # Re-verify only this segment; problems should be empty now (with mocked verifier)
         by_id = {s["story_id"]: s for s in stories}
-        entry = verify._check(seg, by_id, language="en")
+        # The verifier's model call is mocked too, so this test never reaches the API
+        checked = {"claims": [{"claim": "Apple revenue rose 10%", "verdict": "supported", "sources": ["a1"]}],
+                   "investment_advice": False}
+        with mock.patch.object(verify, "chat_json", return_value=checked):
+            entry = verify._check(seg, by_id, language="en")
         problems = verify.problems([entry])
         self.assertEqual(problems, [])
 
