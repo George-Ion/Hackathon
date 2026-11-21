@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 
 from . import rank, script, sources, tts, verify
+from .config import voice_for
 from .cost import COST, LISTENER
 
 
@@ -151,7 +152,7 @@ def make_briefing(profile, name, stories, out, audio=True):
             f"{source_issues} unresolved source(s). Fix the text before requesting audio."
         )
     if audio:
-        timeline = tts.synthesize_briefing(segments, mp3_path, timeline_path, lang)
+        timeline = tts.synthesize_briefing(segments, mp3_path, timeline_path, lang, voice_id=voice_for(profile))
         rows = sources.build(segments, picked, lang, timeline)
         sources.write(rows, profile.get("name", name), out / f"{name}.sources.json", out / f"{name}.sources.md")
         source_issues = sum(1 for row in rows if row.get("warning"))
@@ -206,7 +207,7 @@ def synthesize_saved_briefing(profile, name, stories, out):
         mp3_path.unlink()
     if timeline_path.exists():
         timeline_path.unlink()
-    timeline = tts.synthesize_briefing(segments, mp3_path, timeline_path, lang)
+    timeline = tts.synthesize_briefing(segments, mp3_path, timeline_path, lang, voice_id=voice_for(profile))
     rows = sources.build(segments, picked, lang, timeline)
     sources.write(rows, profile.get("name", name), out / f"{name}.sources.json", out / f"{name}.sources.md")
     summary = {

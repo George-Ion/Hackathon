@@ -373,6 +373,7 @@ async function boot(){
   try{
     const [ls, names, stories, status, cost] = await Promise.all([api('/api/listeners'), api('/api/briefings'), api('/api/stories'), api('/api/status'), api('/api/cost').catch(()=>({}))]);
     S.prerank = await api('/api/prerank').catch(()=>({}));
+    S.voices = await api('/api/voices').catch(()=>[]);
     S.listeners=ls; S.names=names; S.stories=stories; S.status=status; S.cost=cost;
     stories.forEach((s,i)=>{ s.rank=i+1; S.byId[s.story_id]=s; });
     ls.forEach(l=>S.profiles[l.file]=l.profile);
@@ -529,7 +530,7 @@ function renderWho(d){
   const matched=new Set(hits(allTags, likes));
   $('#who').innerHTML=`<div class="crit">Fit to the listener</div><h3>Why ${esc(p.name)} hears these stories</h3><p class="muted" style="margin:0;font-size:14px">${esc(p.description||'')}</p>
     <div class="tags">${likes.map(t=>`<span class="tag ${matched.has(t)?'hit':''}">${esc(t)}</span>`).join('')}${avoid.map(t=>`<span class="tag avoid">${esc(t)}</span>`).join('')}</div>
-    <div class="kv"><span>Language</span><span>${esc(LANG[p.language]||p.language)}</span><span>Depth</span><span>${esc(p.depth||'—')}</span><span>Tone</span><span>${esc(p.tone||'—')}</span><span>Length</span><span>${esc(p.length_minutes)} min target · ${esc(d.summary?.minutes)} min spoken</span></div>
+    <div class="kv"><span>Language</span><span>${esc(LANG[p.language]||p.language)}</span><span>Depth</span><span>${esc(p.depth||'—')}</span><span>Tone</span><span>${esc(p.tone||'—')}</span><span>Voice</span><span>${esc(voiceName(p.voice_id))}</span><span>Length</span><span>${esc(p.length_minutes)} min target · ${esc(d.summary?.minutes)} min spoken</span></div>
     <ol class="picked">${ids.map(id=>{ const s=S.byId[id]||{}; const m=hits(new Set((s.topics||[]).map(t=>t.toLowerCase())), likes);
       return `<li><span>${esc(s.headline||id)}<small>${m.length?'Matches '+esc(m.join(', ')):'One of the day\u2019s biggest stories'}${s.importance>=8?' · major story today':''}</small></span></li>`; }).join('')}</ol>
     <button class="btn ghost wide" style="margin-top:16px" id="tweak">Try a variation as a wildcard</button>`;
@@ -623,13 +624,14 @@ function openWildcard(p={}){
     <label>Length<select name="length_minutes">${[2,3,4,5,6].map(m=>`<option ${+p.length_minutes===m||(!p.length_minutes&&m===3)?'selected':''} value="${m}">${m} minutes</option>`).join('')}</select></label>
     <label>Stories<select name="max_stories">${[3,4,5,6,7].map(m=>`<option ${+p.max_stories===m||(!p.max_stories&&m===4)?'selected':''} value="${m}">${m} stories</option>`).join('')}</select></label>
     <label class="full">Tone<input name="tone" value="${v('tone','calm and direct')}"></label>
+    <label class="full">Voice${voicePicker('wvoice', p.voice_id)}</label>
     <label class="full check"><input type="checkbox" name="audio" ${audioOk?'':'disabled'}> Include voice (uses ElevenLabs credits)</label>
     <div class="full" style="display:flex;gap:10px"><button class="btn" id="go" type="submit">Generate briefing</button><button class="btn ghost" type="button" id="cancel">Cancel</button></div>
    </form><div class="progress" id="prog"></div>`);
-  $('#cancel').onclick=closeDrawer;
+  $('#cancel').onclick=closeDrawer; wirePreview($('#dbody'));
   $('#wf').onsubmit=async e=>{ e.preventDefault(); const f=new FormData(e.target); const list=k=>String(f.get(k)||'').split(',').map(x=>x.trim()).filter(Boolean);
     const profile={name:String(f.get('name')).trim(), description:String(f.get('description')||''), language:f.get('language'), interests:list('interests'), avoid:list('avoid'),
-      depth:String(f.get('depth')||''), length_minutes:+f.get('length_minutes'), max_stories:+f.get('max_stories'), tone:String(f.get('tone')||'')};
+      depth:String(f.get('depth')||''), length_minutes:+f.get('length_minutes'), max_stories:+f.get('max_stories'), tone:String(f.get('tone')||''), voice_id:($('#wvoice')||{}).value};
     const name='wild_'+profile.name.toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_|_$/g,'').slice(0,30);
     $('#go').disabled=true; const prog=$('#prog'); prog.classList.add('open'); const t0=Date.now();
     const tick=setInterval(()=>{ prog.innerHTML=`<span class="spin"></span>Ranking, writing, verifying${f.get('audio')?' and voicing':''}… ${Math.round((Date.now()-t0)/1000)} s`; },500);
@@ -684,12 +686,15 @@ function showRequest(j){
     <div class="label" style="margin-top:18px">What you will get</div><p style="margin:6px 0 0">${esc(j.understood||p.description)}</p>
     <div class="tags">${p.interests.map(t=>`<span class="tag hit">${esc(t)}</span>`).join('')}${p.avoid.map(t=>`<span class="tag avoid">${esc(t)}</span>`).join('')}</div>
     <div class="kv"><span>Language</span><span>${esc(LANG[p.language]||p.language)}</span><span>Length</span><span>${p.length_minutes} minutes · up to ${p.max_stories} stories</span><span>Depth</span><span>${esc(p.depth)}</span></div>
+    <div class="label" style="margin-top:16px">Voice</div><div style="margin-top:8px">${voicePicker('rvoice', p.voice_id)}</div>
     <label class="check" style="display:flex;margin-top:16px"><input type="checkbox" id="vaudio" ${audioOk?'checked':'disabled'}> Include voice (uses ElevenLabs credits)</label>
     <div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap"><button class="btn" id="vgo">Make my briefing</button><button class="btn ghost" id="vedit">Adjust first</button></div>
     <div class="progress" id="vprog"></div>
     <p class="dim" style="font-size:12px;margin-top:14px">Understanding the request cost ${money(j.usd)}. The recording was deleted after transcription.</p>`;
-  $('#vedit').onclick=()=>openWildcard(p);
-  $('#vgo').onclick=()=>produce(p, 'voice_'+Date.now().toString(36), $('#vaudio').checked, $('#vprog'), $('#vgo'));
+  wirePreview($('#vres'));
+  const withVoice=()=>({...p, voice_id:($('#rvoice')||{}).value});
+  $('#vedit').onclick=()=>openWildcard(withVoice());
+  $('#vgo').onclick=()=>produce(withVoice(), 'voice_'+Date.now().toString(36), $('#vaudio').checked, $('#vprog'), $('#vgo'));
 }
 async function produce(profile, name, withAudio, prog, btn){
   btn.disabled=true; prog.classList.add('open'); const t0=Date.now();
@@ -703,6 +708,22 @@ async function produce(profile, name, withAudio, prog, btn){
   }catch(err){ clearInterval(tick); prog.innerHTML=`<span class="bad">${esc(err.message)}</span>`; btn.disabled=false; }
 }
 $('#voicebtn').onclick=openVoice;
+
+// ---------- voice picker
+function voiceName(id){ const v=(S.voices||[]).find(x=>x.id===id) || (S.voices||[])[0]; return v ? v.name : 'Default'; }
+function voicePicker(id, selected){
+  const vs=S.voices||[]; if(!vs.length) return '';
+  return `<div style="display:flex;gap:8px;align-items:stretch"><select id="${id}" style="flex:1">${vs.map(v=>`<option value="${esc(v.id)}" ${v.id===selected?'selected':''}>${esc(v.name)} · ${esc(v.about)}</option>`).join('')}</select>
+    <button type="button" class="btn ghost" data-preview="${id}" style="padding:8px 14px;font-size:13px">▶ Preview</button></div>`;
+}
+let previewAudio=null;
+async function previewVoice(selId, btn){
+  const id=$('#'+selId).value; btn.disabled=true; const label=btn.textContent; btn.innerHTML='<span class="spin"></span>';
+  try{ const {url}=await api('/api/voice-preview/'+id); if(previewAudio) previewAudio.pause(); previewAudio=new Audio(url); await previewAudio.play(); }
+  catch(e){ toast(e.message); }
+  finally{ btn.disabled=false; btn.textContent=label; }
+}
+function wirePreview(root){ root.querySelectorAll('[data-preview]').forEach(b=>b.onclick=()=>previewVoice(b.dataset.preview,b)); }
 
 boot();
 </script>

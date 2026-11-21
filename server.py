@@ -16,7 +16,7 @@ import uuid
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-from briefing import ingest, make, voice_request
+from briefing import config, ingest, make, tts, voice_request
 from briefing.cost import COST
 
 ROOT = Path(__file__).resolve().parent
@@ -133,6 +133,10 @@ class Handler(SimpleHTTPRequestHandler):
             return self._json({k: story.get(k) for k in ("story_id", "headline", "summary", "topics", "importance", "n_sources", "published", "facts", "conflicts")} | {
                 "articles": [{k: a.get(k) for k in ("id", "outlet", "title", "url", "published", "language", "translations")} for a in story.get("articles", [])]
             })
+        if path == "/api/voices":
+            return self._json(config.VOICES)
+        if path.startswith("/api/voice-preview/"):
+            return self._voice_preview(path.rsplit("/", 1)[1])
         if path == "/api/prerank":
             pr = read_json(OUT / "prerank.json", {}) or {}
             return self._json({k: pr.get(k) for k in ("groups", "shortlisted", "k_per_listener", "k_global", "listeners")})
@@ -247,6 +251,22 @@ class Handler(SimpleHTTPRequestHandler):
             destination.write_text(json.dumps(profile, indent=2, ensure_ascii=False), encoding="utf-8")
             return self._json({"file": name, "profile": profile})
         self.send_error(404)
+
+    def _voice_preview(self, voice_id):
+        """A short sample of a voice, made once per voice and cached in out/ (about $0.01 each)."""
+        voice = next((v for v in config.VOICES if v["id"] == voice_id), None)
+        if not voice:
+            return self._json({"error": "Unknown voice."}, 404)
+        name = f"preview_{voice_id}.mp3"
+        if not (OUT / name).exists():
+            text = f"Good morning. I'm {voice['name']}, and this is your news briefing for today."
+            try:
+                tts.synthesize_briefing([{"story_id": None, "text": text}], OUT / name,
+                                        OUT / f"preview_{voice_id}.timeline.json", "en", voice_id=voice_id)
+            except Exception as e:
+                traceback.print_exc()
+                return self._json({"error": f"Could not make a preview: {type(e).__name__}: {e}"}, 502)
+        return self._json({"url": f"/out/{name}"})
 
     def _voice_request(self, length):
         """A recorded 'what I want to hear today' memo -> transcript + listener profile (no briefing yet).

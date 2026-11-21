@@ -27,6 +27,22 @@ API_BUDGET_USD = float(os.getenv("API_BUDGET_USD", 5.0))
 
 # The ElevenLabs SDK reads ELEVENLABS_API_KEY from the environment itself
 ELEVENLABS_VOICE_ID = os.getenv("ELEVENLABS_VOICE_ID", "JBFqnCBsd6RMkjVDRZzb")  # George, pre-made
+# ElevenLabs pre-made voices a listener can pick (all speak English, Dutch and German with the
+# multilingual model). Checked against this account's key on 21 Nov.
+VOICES = [
+    {"id": "JBFqnCBsd6RMkjVDRZzb", "name": "George", "about": "British, male, warm"},
+    {"id": "onwK4e9ZLuTAKqWW03F9", "name": "Daniel", "about": "British, male, news presenter"},
+    {"id": "Xb7hH8MSUJpSbSDYk0k2", "name": "Alice", "about": "British, female, clear"},
+    {"id": "pFZP5JQG7iQjIQuC4Bku", "name": "Lily", "about": "British, female, warm"},
+    {"id": "EXAVITQu4vr4xnSDxMaL", "name": "Sarah", "about": "American, female, calm"},
+    {"id": "nPczCjzI2devNBz1zQrb", "name": "Brian", "about": "American, male, deep"},
+]
+
+
+def voice_for(profile):
+    """The listener's chosen voice if it is one of VOICES, else the default."""
+    wanted = (profile or {}).get("voice_id")
+    return wanted if any(v["id"] == wanted for v in VOICES) else ELEVENLABS_VOICE_ID
 TTS_MODEL = os.getenv("TTS_MODEL", "eleven_v4")
 
 # Articles whose embeddings are at least this similar are treated as the same event
