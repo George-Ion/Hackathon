@@ -1,4 +1,4 @@
-"""Local test page for the briefing pipeline. Standard library only.
+"""Local web app for Liquid Briefing: the page in web/ and its API. Standard library only.
 
   python server.py            -> http://localhost:8000
 

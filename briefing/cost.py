@@ -1,4 +1,4 @@
-"""Tracks every paid call so we can report full-dataset cost and the 10x estimate (15% of the score).
+"""Tracks every paid call so we can report the measured cost, the full-dataset cost and the 10x estimate.
 Also provides a cumulative spend ledger to enforce the API budget across processes.
 """
 import contextvars

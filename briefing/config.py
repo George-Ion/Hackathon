@@ -1,3 +1,4 @@
+"""Settings read from .env: models, prices, budget, voices and grouping thresholds."""
 import os
 from pathlib import Path
 

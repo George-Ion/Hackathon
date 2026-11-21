@@ -13,3 +13,4 @@ pkg/
 
 agents/logs/
 out_backup/
+.claude/

@@ -1,6 +1,7 @@
 # Pitch notes: The Liquid Briefing
 
-Talking points for the presentation. Numbers come from `out/cost.json` and the README's final run.
+Talking points for the presentation. Numbers come from the measured run in the README (the app's cost section
+shows the same figures).
 
 ## 1. Problem
 - A newsroom (or a feed like Newstex) gets thousands of articles a day. Readers don't have time to read them,
@@ -14,8 +15,11 @@ Talking points for the presentation. Numbers come from `out/cost.json` and the R
 - **Every claim is traceable**: facts are extracted with their source article ids, the script may only use those
   facts, a checker compares every figure and claim against the sources and an automatic fix pass corrects what it
   flags. Each briefing comes with show notes: claim -> outlet -> link, at the second it is spoken.
-- Conflicting sources are said out loud ("Invezz reports X, ActionForex reports Y"). No investment advice, by rule
-  and by check.
+- Conflicting sources are said out loud ("Invezz reports X, ActionForex reports Y").
+- It informs and never instructs: no advice of any kind and no alarmist wording, by rule and by check. Official
+  guidance is reported only when it is attributed.
+- Anyone can be a listener: create a wildcard profile, or just say what you want ("I'm Sophie, three minutes on gold,
+  and I definitely want the Anthropic IPO"). A story you name goes first, or you are told it is not in today's news.
 
 ## 3. Cost and scale (15% of the score)
 - Cheap where possible: translation merging and ranking are rules (free); clustering is embeddings (~$0.001 a
@@ -23,11 +27,11 @@ Talking points for the presentation. Numbers come from `out/cost.json` and the R
 - Pre-ranking with free signals (outlet count, sections, profile similarity) picks the stories that can reach a
   briefing; only those are extracted. Extracting every story of the full dataset cost us ~$4.95 (1,400 stories);
   with pre-ranking the extraction bill is capped by the number of listeners, not by article volume.
-- Measured run (18 Nov: 124 articles -> 99 stories, 36 shortlisted, 4 listeners + the live wildcard):
-  **$4.42** for the whole edition. Shared: $0.09 extraction. Per briefing: ~$0.18 text (script and check) and
-  ~$0.69 voice, so **under $0.90 per listener a day**.
-- Full dataset (1,502 articles after folding translations): **~$4.51**. 10x volume: **~$4.60**. The article part
-  only grows from $0.10 to under $0.30 because extraction is capped by listener count; almost all of the cost is
+- Measured run (18 Nov: 124 articles -> 99 stories, 36 shortlisted, 4 listeners): **$3.79** for the whole
+  edition. Shared steps: $0.09. Per briefing: ~$0.18 text (script and checks) and ~$0.74 voice, so **$0.92 per
+  listener a day** on average ($0.71-$1.14, measured exactly per listener).
+- Full dataset (1,502 articles after folding translations): **~$3.88**. 10x volume: **~$3.97**. The article part
+  only grows from $0.09 to under $0.30 because extraction is capped by listener count; almost all of the cost is
   the voice, which grows with listeners, not articles.
 - Clustering never merges articles more than 72 hours apart, so a week of recurring topics ("EUR/USD outlook")
   doesn't collapse into one story.

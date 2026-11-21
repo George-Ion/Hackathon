@@ -1,3 +1,4 @@
+"""OpenAI calls: JSON chat completions with retries and budget checks, and embeddings. Every call is costed."""
 import json
 
 from .config import EMBED_MODEL, REASONING, PRICES

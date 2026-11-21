@@ -169,17 +169,37 @@ python tools/check_done.py               # checks the outputs against docs/proce
 ## Project layout
 
 ```
-briefing/     the pipeline: ingest, cluster, prerank, extract, rank, script, verify, tts, sources, cost
-              plus voice_request (spoken requests), must_hear (named stories), ondemand (wildcard stories)
-listeners/    the four listener profiles
-web/          the app (one page)
-server.py     local server for the app and its API
-run.py        command line pipeline
-tools/        output checker and MP3 repair tool
-agents/       the GPT-5 worker and critic agents used during the build
-docs/         pitch notes and process documents
-tests/        unit tests
+run.py          command line: build an edition (start here to follow the pipeline)
+server.py       the web app's server and API
+briefing/       the pipeline, one module per step (see below)
+web/            the app: one page, index.html
+listeners/      the four listener profiles (JSON)
+tests/          unit tests, fully offline
+tools/          output checker and MP3 repair tool
+agents/         the GPT-5 worker and critic agents used during the build
+docs/           pitch notes, screenshots, process documents
 ```
+
+Not in git: `.env` (your keys), `data/` (licensed articles), `out/` (generated briefings).
+
+### Code map: `briefing/`, in pipeline order
+
+| Module | What it does |
+|---|---|
+| `ingest.py` | Reads the JSONL feeds, keeps a date window, folds German and Dutch translations into the English original |
+| `cluster.py` | Groups articles about the same event: embeddings, then a small-model check of borderline pairs |
+| `prerank.py` | Free signals (coverage, recency, listener fit) pick the stories worth a model call |
+| `extract.py` | Small model: facts and figures with source article IDs, disagreements, importance |
+| `rank.py` | Orders stories for each listener; named "must hear" stories go first |
+| `script.py` | Large model: the spoken script, from the facts only, at a fixed length; repairs flagged segments |
+| `verify.py` | Checks every claim, number and piece of advice against the facts |
+| `tts.py` | ElevenLabs voice, disclosure first, timeline of which story plays when |
+| `sources.py` | Show notes: every claim with outlet, title and link |
+| `make.py` | One listener's briefing end to end (used by `run.py` and `server.py`) |
+| `ondemand.py` | Extracts a new wildcard listener's missing stories live |
+| `voice_request.py` | A spoken "what I want to hear" becomes a listener profile |
+| `must_hear.py` | Finds a story a listener names |
+| `llm.py`, `cost.py`, `config.py` | Model calls with retries, spend tracking and budget, settings from `.env` |
 
 ## Data and disclosure
 

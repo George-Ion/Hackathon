@@ -1,4 +1,4 @@
-"""Trust check (25% of the score): every story segment is checked against its extracted facts.
+"""Trust check: every story segment is checked against its extracted facts.
 Cheap deterministic number check first, then a cheap-model claim check."""
 import contextvars
 import json
