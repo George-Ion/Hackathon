@@ -594,23 +594,30 @@ async function openStory(id){
 }
 
 // ---------- cost
-function renderCost(){
+async function renderCost(){
   const c=S.cost||{}; const steps=c.measured?.steps||c.steps||{}; const pr=c.projections||{};
   const tier=n=>n.startsWith('tts')?'voice':(n.startsWith('script')?'large':'cheap');
-  const listenerUsd=Object.entries(steps).filter(([n])=>/^(script|verify|tts)/.test(n)).reduce((a,[,v])=>a+v.usd,0);
-  const nl=Math.max(1,S.names.length); const per=listenerUsd/nl;
+  // Shared steps run once per edition; their cost scales with article volume (see the projections)
+  const shared=n=>/^(embed|extract|cluster_confirm) \(/.test(n);
+  const sharedUsd=o=>Object.entries(o||{}).filter(([n])=>shared(n)).reduce((a,[,v])=>a+(typeof v==='number'?v:(v.usd||0)),0);
+  // Each briefing's exact script + voice cost (every call is tagged with its listener)
+  const sums=await Promise.all(S.names.map(n=>briefing(n).then(b=>b.summary||{}).catch(()=>({}))));
+  const listenersUsd=sums.reduce((a,s)=>a+(s.usd||0),0), n=Math.max(1,S.names.length), per=listenersUsd/n;
+  const today=sharedUsd(steps)+listenersUsd;
+  const full=pr.full_dataset ? sharedUsd(pr.full_dataset.steps_usd)+listenersUsd : null;
+  const ten=pr.ten_x_volume ? sharedUsd(pr.ten_x_volume.steps_usd)+listenersUsd : null;
   $('#perl').textContent=money(per);
   $('#costgrid').innerHTML=[
-    ['Measured', money(c.measured?.total_usd??c.total_usd), `one day, ${c.measured?.articles||'—'} articles, ${S.names.length} listeners`],
-    ['Per listener', money(per), 'per day, voice included'],
-    ['Full dataset', money(pr.full_dataset?.estimated_usd), `${(pr.full_dataset?.articles||0).toLocaleString()} articles, estimated`],
-    ['10× volume', money(pr.ten_x_volume?.estimated_usd), `${(pr.ten_x_volume?.articles||0).toLocaleString()} articles, estimated`]
+    ['Measured', money(today), `one day, ${c.measured?.articles||'—'} articles, ${S.names.length} listeners, voice included`],
+    ['Per listener', money(per), 'per day: script and voice'],
+    ['Full dataset', money(full), `${(pr.full_dataset?.articles||0).toLocaleString()} articles, estimated`],
+    ['10× volume', money(ten), `${(pr.ten_x_volume?.articles||0).toLocaleString()} articles, estimated`]
   ].map(([l,b,s])=>`<div class="card cost"><div class="label">${l}</div><b>${b}</b><span>${s}</span></div>`).join('');
   const entries=Object.entries(steps).sort((a,b)=>b[1].usd-a[1].usd); const max=Math.max(...entries.map(e=>e[1].usd),0.0001);
   const col={cheap:'var(--accent)',large:'var(--violet)',voice:'var(--warn)'};
-  $('#bars').innerHTML=`<div class="label">Measured cost by step</div>`+entries.map(([n,v])=>`<div class="brow"><span>${esc(n)}<small class="dim" style="display:block;font-size:11.5px">${v.calls} calls · ${(v.in||0).toLocaleString()} in / ${(v.out||0).toLocaleString()} out</small></span><div class="btrack"><i style="width:${v.usd/max*100}%;background:${col[tier(n)]}"></i></div><span class="usd">${money(v.usd)}</span></div>`).join('')
+  $('#bars').innerHTML=`<div class="label">Every paid call in this edition, by step</div>`+entries.map(([n,v])=>`<div class="brow"><span>${esc(n)}<small class="dim" style="display:block;font-size:11.5px">${v.calls} calls · ${(v.in||0).toLocaleString()} in / ${(v.out||0).toLocaleString()} out</small></span><div class="btrack"><i style="width:${v.usd/max*100}%;background:${col[tier(n)]}"></i></div><span class="usd">${money(v.usd)}</span></div>`).join('')
     +`<div class="legend"><span><i style="background:var(--accent)"></i>Cheap: embeddings and small model</span><span><i style="background:var(--violet)"></i>Large model: script only</span><span><i style="background:var(--warn)"></i>Voice</span></div>
-    <p class="dim" style="font-size:12px;margin:14px 0 0">${esc(pr.method||'')}</p>`;
+    <p class="dim" style="font-size:12px;margin:14px 0 0">The cards above count the shared steps once plus the exact cost of the ${S.names.length} briefings on this page. The bars also include wildcard briefings, voice requests and voice previews made during the edition. ${esc(pr.method||'')}</p>`;
 }
 
 // ---------- drawer + wildcard

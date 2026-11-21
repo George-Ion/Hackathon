@@ -7,6 +7,23 @@ audio links back to the article it came from.
 
 Built at the MAIN AI Hackathon 2026 (Maastricht, Sourcera track) by team **IT WORKS LOCALLY**: Georgios and Simon.
 
+![The app: pick a listener and press play](docs/screenshots/app.png)
+
+## Screenshots
+
+**Transcript and trust report.** Every segment opens up to its facts and source articles; the trust report shows
+what was checked, and "Spot-check 3 random claims" puts claims next to their articles.
+
+![Transcript with evidence and the trust report](docs/screenshots/trust.png)
+
+**Same news, different briefing.** Two listeners side by side: different stories, order, length and language.
+
+![Two listeners compared](docs/screenshots/compare.png)
+
+**Cost.** Measured per edition and per listener, with estimates for the full dataset and ten times the volume.
+
+![Cost section](docs/screenshots/cost.png)
+
 ## Features
 
 **Listen**
@@ -125,15 +142,18 @@ Text-only runs delete a listener's old MP3, so stale audio never plays with a ne
 | `ELEVENLABS_VOICE_ID`, `TTS_MODEL` | optional | Default voice and voice model |
 | `CLUSTER_THRESHOLD`, `CLUSTER_CONFIRM`, `CLUSTER_CONFIRM_LOW`, `PORT`, `AGENT_*` | optional | Grouping tuning, the app's port, the build-time agents' models |
 
-## Cost (measured run, 18 Nov: 124 articles, 4 listeners + 1 wildcard)
+## Cost (measured run, 18 Nov: 124 articles, 4 listeners)
 
 | | |
 |---|---|
 | Articles → stories | 124 → 99 stories; 36 shortlisted for extraction |
-| Whole edition, measured | **$4.42** (voice $3.43, scripts $0.85, extraction $0.09, checks $0.05) |
-| Per listener per day | $0.11–0.25 script + $0.47–1.03 voice (exact, per listener) |
-| Full dataset (1,502 articles), estimated | **$4.51** |
-| 10x volume (15,020 articles), estimated | **$4.60** |
+| Whole edition, measured | **$3.79**: voice $2.96, scripts and checks $0.73, shared steps $0.09 |
+| Per listener per day | **$0.92** on average ($0.71–1.14, exact per listener) |
+| Full dataset (1,502 articles), estimated | **$3.88** |
+| 10x volume (15,020 articles), estimated | **$3.97** |
+
+These are the shared steps (embeddings, grouping check, extraction) counted once, plus the exact cost of each
+listener's briefing. Wildcard briefings and voice previews made in the app are logged separately.
 
 Article-dependent costs stay small because only shortlisted stories are extracted; most of the cost is the voice,
 which grows with listeners, not articles. Prices come from `.env` (token prices, and `TTS_PER_1K_CHARS` for voice):
